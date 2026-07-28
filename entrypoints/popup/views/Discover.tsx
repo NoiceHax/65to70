@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from 'react';
-import { browser } from 'wxt/browser';
 import {
   recommend,
   recommendationReadiness,
@@ -35,19 +34,24 @@ export default function Discover() {
 
   if (!readiness) return null;
 
-  // Two very different problems, and "no recommendations" alone names neither.
+  {
+    /*
+     * Two different problems, and neither is the user's to diagnose.
+     *
+     * This previously named a script and told them to load a file — a build
+     * step described in a popup, as though the extension shipping without its
+     * own data were something they had done wrong.
+     */
+  }
   if (!readiness.hasIndex) {
     return (
       <section>
         <h2>For you</h2>
         <p className="empty">
-          Recommendations need the relationship index. Build it with{' '}
-          <code>pipeline/buildSimilar.ts</code> and load it in settings — after
-          that they run entirely offline.
+          Suggestions aren&apos;t available in this build. Once they are, they
+          run entirely on this machine — nothing about what you watch is sent
+          anywhere to produce them.
         </p>
-        <button className="link" onClick={() => void browser.runtime.openOptionsPage()}>
-          Open settings
-        </button>
       </section>
     );
   }
