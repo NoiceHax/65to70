@@ -1,6 +1,14 @@
 import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { db, emptyCoverage, recomputeWatchState, watchedEpisodes } from '@/lib/db';
+import {
+  clearManualProgress,
+  db,
+  emptyCoverage,
+  recomputeWatchState,
+  setManualProgress,
+  titleProgress,
+  watchedEpisodes,
+} from '@/lib/db';
 import { titleKey, type MediaType, type Movie, type Session } from '@/lib/types';
 
 const SHOW = titleKey('tv', 1399);
@@ -127,6 +135,74 @@ describe('watchedEpisodes', () => {
 
     const episodes = await watchedEpisodes(SHOW);
     expect(episodes.map((e) => `S${e.season}E${e.episode}`)).toEqual(['S2E3', 'S1E1']);
+  });
+});
+
+describe('progress across fragmented sessions', () => {
+  it('adds up a viewing split by page reloads', async () => {
+    // Ad layers on these sites force reloads, and each reload starts a fresh
+    // session. Reporting only the newest is how a finished film reads as a
+    // quarter watched.
+    await db.movies.put(record('movie', 27205, 'Inception'));
+    await db.sessions.bulkAdd([
+      session(FILM, 0, 29),
+      session(FILM, 30, 59),
+      session(FILM, 60, 94),
+    ]);
+
+    expect(await titleProgress(FILM)).toBeCloseTo(0.95, 2);
+  });
+
+  it('reports zero when nothing has been seen', async () => {
+    await db.movies.put(record('movie', 27205, 'Inception'));
+    expect(await titleProgress(FILM)).toBe(0);
+  });
+});
+
+describe('manual progress', () => {
+  it('marks a film watched when set past the threshold', async () => {
+    await db.movies.put(record('movie', 27205, 'Inception'));
+    await db.sessions.add(session(FILM, 0, 24));
+
+    await setManualProgress(FILM, 1);
+
+    const film = await db.movies.get(FILM);
+    expect(film?.watched).toBe(1);
+    expect(await titleProgress(FILM)).toBe(1);
+  });
+
+  it('is not overwritten by later measurement', async () => {
+    // The whole point: measurement disagreeing afterwards must not undo it.
+    await db.movies.put(record('movie', 27205, 'Inception'));
+    await db.sessions.add(session(FILM, 0, 24));
+
+    await setManualProgress(FILM, 1);
+    await recomputeWatchState(FILM);
+
+    expect((await db.movies.get(FILM))?.watched).toBe(1);
+  });
+
+  it('clamps out-of-range values', async () => {
+    await db.movies.put(record('movie', 27205, 'Inception'));
+
+    await setManualProgress(FILM, 5);
+    expect(await titleProgress(FILM)).toBe(1);
+
+    await setManualProgress(FILM, -2);
+    expect(await titleProgress(FILM)).toBe(0);
+  });
+
+  it('hands progress back to measurement when cleared', async () => {
+    await db.movies.put(record('movie', 27205, 'Inception'));
+    await db.sessions.add(session(FILM, 0, 24));
+
+    await setManualProgress(FILM, 1);
+    await clearManualProgress(FILM);
+
+    const film = await db.movies.get(FILM);
+    expect(film?.manualProgress).toBeUndefined();
+    expect(film?.watched).toBe(0);
+    expect(await titleProgress(FILM)).toBeCloseTo(0.25, 2);
   });
 });
 

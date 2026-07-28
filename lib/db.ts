@@ -102,6 +102,10 @@ export async function recomputeWatchState(key: TitleKey): Promise<void> {
   const movie = await db.movies.get(key);
   if (!movie) return;
 
+  // A figure set by hand is not something later measurement gets to overwrite.
+  // Episode counts still update, since those are counted rather than measured.
+  const manual = movie.manualProgress !== undefined;
+
   /*
    * Coverage only ever unions within a single episode.
    *
@@ -129,7 +133,7 @@ export async function recomputeWatchState(key: TitleKey): Promise<void> {
     // A series is never "finished" the way a film is; it accumulates. Watched
     // here means at least one episode has been seen through.
     await db.movies.update(key, {
-      watched: finishedGroups > 0 ? 1 : 0,
+      ...(manual ? {} : { watched: finishedGroups > 0 ? 1 : 0 }),
       episodesWatched: finishedGroups,
       rewatch: rewatches,
     });
@@ -137,9 +141,60 @@ export async function recomputeWatchState(key: TitleKey): Promise<void> {
   }
 
   await db.movies.update(key, {
-    watched: finishedGroups > 0 ? 1 : 0,
+    ...(manual ? {} : { watched: finishedGroups > 0 ? 1 : 0 }),
     rewatch: rewatches,
   });
+}
+
+/**
+ * How much of a title has been seen, across every session for it.
+ *
+ * A single session is not the answer. Pages reload — ad layers on these sites
+ * force it constantly — and each reload starts a fresh session, so a film
+ * watched in three stretches has three partial bitmaps. Reporting only the
+ * latest is how a finished film reads as a quarter watched.
+ *
+ * A manual figure wins outright: the person watching knows better than the
+ * measurement does.
+ */
+export async function titleProgress(key: TitleKey): Promise<number> {
+  const movie = await db.movies.get(key);
+  if (movie?.manualProgress !== undefined) return movie.manualProgress;
+
+  const sessions = await db.sessions.where('titleKey').equals(key).toArray();
+  if (sessions.length === 0) return 0;
+
+  if (movie?.mediaType === 'tv') {
+    // Progress through a single episode is the only meaningful figure for a
+    // series; the newest one is what the viewer is on.
+    const newest = sessions.reduce((a, b) => (b.lastSeenAt > a.lastSeenAt ? b : a));
+    const sameEpisode = sessions.filter(
+      (s) => s.season === newest.season && s.episode === newest.episode,
+    );
+    return coverageRatio(unionCoverage(sameEpisode.map((s) => s.coverage)));
+  }
+
+  return coverageRatio(unionCoverage(sessions.map((s) => s.coverage)));
+}
+
+/**
+ * Set progress by hand, overriding measurement.
+ *
+ * Also settles whether it counts as watched, since that is the reason anyone
+ * reaches for this — a film finished that the bitmap disagrees about.
+ */
+export async function setManualProgress(key: TitleKey, ratio: number): Promise<void> {
+  const clamped = Math.max(0, Math.min(1, ratio));
+  await db.movies.update(key, {
+    manualProgress: clamped,
+    watched: clamped >= COMPLETION_THRESHOLD ? 1 : 0,
+  });
+}
+
+/** Hand progress back to measurement. */
+export async function clearManualProgress(key: TitleKey): Promise<void> {
+  await db.movies.update(key, { manualProgress: undefined });
+  await recomputeWatchState(key);
 }
 
 export interface ActiveTracking {
@@ -181,11 +236,17 @@ export async function activeTracking(withinMs = 90_000): Promise<ActiveTracking[
     let title: string | null = null;
     let identified = false;
 
+    // Across every session for the title, not just this one. Reloads fragment
+    // a single viewing into several sessions, and reporting the newest alone
+    // makes a finished film read as barely started.
+    let ratio = coverageRatio(session.coverage);
+
     if (session.titleKey) {
       const movie = await db.movies.get(session.titleKey);
       if (movie) {
         title = movie.title;
         identified = true;
+        ratio = await titleProgress(session.titleKey);
       }
     }
 
@@ -200,7 +261,7 @@ export async function activeTracking(withinMs = 90_000): Promise<ActiveTracking[
       title: title || 'Identifying…',
       identified,
       site: session.site,
-      ratio: coverageRatio(session.coverage),
+      ratio,
       season: session.season,
       episode: session.episode,
       lastSeenAt: session.lastSeenAt,

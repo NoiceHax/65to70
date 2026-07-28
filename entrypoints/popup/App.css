@@ -293,6 +293,59 @@ ul {
   padding: 5px 0;
 }
 
+.lib-main {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.pct {
+  padding: 0 3px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+.pct:hover {
+  background: var(--field);
+  color: var(--fg);
+}
+
+.manual {
+  color: var(--accent);
+}
+
+.adjust {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0 2px;
+}
+
+.adjust input[type='range'] {
+  flex: 1;
+  min-width: 0;
+  accent-color: var(--accent);
+}
+
+.adjust-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 4px;
+}
+
+.adjust-actions button {
+  padding: 3px 8px;
+  font-size: 11.5px;
+}
+
 .resume .title,
 .library .title {
   overflow: hidden;

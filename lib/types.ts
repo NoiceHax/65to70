@@ -61,6 +61,16 @@ export interface Movie {
   rewatch: number;
 
   /**
+   * Progress set by hand, 0–1, overriding what was measured.
+   *
+   * Measurement is a best guess and sometimes a poor one: a stream padded with
+   * adverts, a different cut, or a page that reloaded mid-film and fragmented
+   * its sessions. The person watching knows better than the bitmap does, so
+   * they get the final say.
+   */
+  manualProgress?: number;
+
+  /**
    * Distinct episodes finished, for series only.
    *
    * A show is never "watched" the way a film is — it accumulates. Cached here
