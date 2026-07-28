@@ -1,5 +1,6 @@
 import { browser } from 'wxt/browser';
 import { extractPageMeta } from '@/lib/pageMeta';
+import { extractUrlIds } from '@/lib/urlIds';
 import { bucketIndex, bucketsCovered } from '@/lib/progress';
 import type { MediaProgressMessage, PageMetaMessage } from '@/lib/messages';
 
@@ -18,6 +19,10 @@ import type { MediaProgressMessage, PageMetaMessage } from '@/lib/messages';
 const SAMPLE_INTERVAL_MS = 5_000;
 /** How often accumulated buckets are flushed to the background. */
 const REPORT_INTERVAL_MS = 15_000;
+/** Floor on re-reading page metadata, which involves parsing any JSON-LD. */
+const META_THROTTLE_MS = 1_000;
+/** Backstop for client-rendered titles that appear well after first paint. */
+const META_POLL_MS = 3_000;
 /**
  * Below this, it's an ad, a trailer, or a preview loop — not something anyone
  * is going to want in their diary. The shortest real target is a ~22 minute
@@ -35,7 +40,10 @@ let lastSampleAt = 0;
 let lastSampleBucket = -1;
 let pendingBuckets = new Set<number>();
 let reportTimer: ReturnType<typeof setInterval> | null = null;
-let lastReportedUrl = '';
+
+let lastMetaSignature = '';
+let lastMetaCheckAt = 0;
+let metaDebounce: ReturnType<typeof setTimeout> | null = null;
 
 function send(message: PageMetaMessage | MediaProgressMessage): void {
   // The worker may be asleep or the extension reloading; neither is worth
@@ -98,6 +106,14 @@ function onTimeUpdate(): void {
   recordCoverage(media, now);
 }
 
+function onPause(): void {
+  flush(false);
+}
+
+function onEnded(): void {
+  flush(true);
+}
+
 function detach(): void {
   if (!media) return;
   flush(true);
@@ -108,14 +124,6 @@ function detach(): void {
   trackedDuration = 0;
   lastSampleBucket = -1;
   lastSampleAt = 0;
-}
-
-function onPause(): void {
-  flush(false);
-}
-
-function onEnded(): void {
-  flush(true);
 }
 
 function attach(el: HTMLVideoElement): void {
@@ -153,16 +161,36 @@ function scanForMedia(): void {
   else if (media && !document.contains(media)) detach();
 }
 
+/**
+ * Report page metadata whenever it actually changes.
+ *
+ * Keying this on the URL alone was a bug. A client-rendered site sets its real
+ * title well after first paint without ever changing the URL, so the first —
+ * wrong — snapshot was captured and never revisited. Comparing a signature of
+ * the extracted values catches the late update instead; re-sending is harmless
+ * because the background merges by tab.
+ */
 function reportPageMeta(): void {
-  if (lastReportedUrl === location.href) return;
-  lastReportedUrl = location.href;
+  const now = Date.now();
+  if (now - lastMetaCheckAt < META_THROTTLE_MS) return;
+  lastMetaCheckAt = now;
 
   const candidates = extractPageMeta(document, location.href);
-  if (candidates.length === 0) return;
+  const urlIds = extractUrlIds(location.href);
+  if (candidates.length === 0 && urlIds.length === 0) return;
+
+  const signature = JSON.stringify([
+    location.href,
+    candidates.map((c) => `${c.strategy}:${c.rawTitle}`),
+    urlIds.map((i) => `${i.source}:${i.id}:${i.season ?? ''}:${i.episode ?? ''}`),
+  ]);
+  if (signature === lastMetaSignature) return;
+  lastMetaSignature = signature;
 
   send({
     type: 'page-meta',
     candidates,
+    urlIds,
     url: location.href,
     hostname: location.hostname,
     isTopFrame,
@@ -176,15 +204,20 @@ export default defineContentScript({
     scanForMedia();
 
     // Players are injected late and swapped on SPA navigation, so neither a
-    // one-shot scan nor a load listener is enough.
+    // one-shot scan nor a load listener is enough. Debounced because video
+    // pages mutate the DOM constantly and re-parsing JSON-LD each time isn't
+    // free.
     const observer = new MutationObserver(() => {
-      reportPageMeta();
-      scanForMedia();
+      if (metaDebounce) clearTimeout(metaDebounce);
+      metaDebounce = setTimeout(() => {
+        reportPageMeta();
+        scanForMedia();
+      }, 300);
     });
     observer.observe(document.documentElement, { childList: true, subtree: true });
 
-    // SPA route changes don't fire navigation events.
-    setInterval(reportPageMeta, 2_000);
+    // Backstop for titles set without a DOM mutation we can observe.
+    setInterval(reportPageMeta, META_POLL_MS);
 
     // Last chance to persist progress before the frame goes away.
     window.addEventListener('pagehide', () => flush(true));

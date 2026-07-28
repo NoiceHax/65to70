@@ -1,4 +1,5 @@
 import type { PageMetaResult } from './pageMeta';
+import type { UrlIdCandidate } from './urlIds';
 
 /**
  * Content script → background.
@@ -13,6 +14,12 @@ import type { PageMetaResult } from './pageMeta';
 export interface PageMetaMessage {
   type: 'page-meta';
   candidates: PageMetaResult[];
+  /**
+   * Catalogue ids read straight out of the URL. Outrank every text candidate
+   * when they verify, and are the only signal on client-rendered sites whose
+   * markup carries no usable title.
+   */
+  urlIds: UrlIdCandidate[];
   url: string;
   hostname: string;
   isTopFrame: boolean;

@@ -130,6 +130,19 @@ export interface PendingDetection {
 
   hostname: string;
   candidates: ResolverCandidate[];
+  /**
+   * Catalogue ids lifted from the URL, carried through so the resolver can
+   * verify them against TMDB. When one checks out it settles the match
+   * outright, with no fuzzy title comparison involved.
+   */
+  urlIds?: Array<{
+    source: 'imdb' | 'tmdb';
+    id: string;
+    mediaType?: MediaType;
+    season?: number;
+    episode?: number;
+    confidence: 'exact' | 'probable';
+  }>;
   detectedAt: number;
   status: 'awaiting' | 'dismissed';
 }

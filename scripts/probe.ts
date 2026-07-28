@@ -13,7 +13,8 @@
  * reason to check in the extension, not a verdict.
  */
 import { Window } from 'happy-dom';
-import { extractPageMeta } from '../lib/pageMeta';
+import { extractPageMeta, rankCandidates } from '../lib/pageMeta';
+import { extractUrlIds } from '../lib/urlIds';
 import { cleanTitle, isUsableTitle } from '../lib/titleClean';
 
 const UA =
@@ -22,25 +23,41 @@ const UA =
 async function probe(url: string): Promise<void> {
   console.log(`\n\x1b[1m${url}\x1b[0m`);
 
+  // URL ids need no network, so they're reported before anything can fail.
+  // On client-rendered sites they're often the only signal that survives.
+  const urlIds = extractUrlIds(url);
+  for (const id of urlIds) {
+    const extra = id.season !== undefined ? ` S${id.season}E${id.episode}` : '';
+    console.log(
+      `  \x1b[36m${'url-id'.padEnd(15)} ${id.source}:${id.id}${extra}` +
+        `  (${id.confidence}${id.mediaType ? `, ${id.mediaType}` : ''})\x1b[0m`,
+    );
+  }
+
   let html: string;
   try {
     const response = await fetch(url, { headers: { 'User-Agent': UA } });
     if (!response.ok) {
-      console.log(`  fetch failed: HTTP ${response.status}`);
+      console.log(`  page fetch failed: HTTP ${response.status}`);
       return;
     }
     html = await response.text();
   } catch (error) {
-    console.log(`  fetch failed: ${(error as Error).message}`);
+    console.log(`  page fetch failed: ${(error as Error).message}`);
     return;
   }
 
   const window = new Window({ url });
   window.document.documentElement.innerHTML = html;
 
-  const candidates = extractPageMeta(window.document as unknown as Document, url);
-  if (candidates.length === 0) {
-    console.log('  no metadata found — Tier 3 would ask the user');
+  const hostname = new URL(url).hostname;
+  const candidates = rankCandidates(
+    extractPageMeta(window.document as unknown as Document, url),
+    hostname,
+  );
+
+  if (candidates.length === 0 && urlIds.length === 0) {
+    console.log('  nothing identifiable — Tier 3 would ask the user');
     return;
   }
 
@@ -62,7 +79,10 @@ async function probe(url: string): Promise<void> {
     console.log(`  ${''.padEnd(15)} \x1b[2mraw: ${candidate.rawTitle.slice(0, 90)}\x1b[0m`);
   }
 
-  console.log(`  \x1b[32m→ would resolve as: ${best ?? '(nothing usable)'}\x1b[0m`);
+  // A URL-borne id settles the match on its own once the resolver verifies it,
+  // so it wins even when a plausible title is also present.
+  const viaId = urlIds[0] ? `${urlIds[0].source}:${urlIds[0].id} (needs verifying)` : null;
+  console.log(`  \x1b[32m→ would resolve via: ${viaId ?? best ?? '(nothing usable)'}\x1b[0m`);
 }
 
 const urls = process.argv.slice(2);

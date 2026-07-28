@@ -179,3 +179,84 @@ export function extractPageMeta(doc: Document, url: string): PageMetaResult[] {
 
   return out;
 }
+
+// ---------------------------------------------------------------------------
+// Ranking
+// ---------------------------------------------------------------------------
+
+/**
+ * How much each source is worth before penalties.
+ *
+ * `document-title` outranks `og:title`, which is the opposite of what the
+ * discovery order suggests, and it's deliberate. On a client-rendered site the
+ * `og:title` is baked into the shell at build time and never updates — it says
+ * "Cineby" on every page — while `document.title` is rewritten by the app to
+ * the actual title. On server-rendered sites the two are usually identical, so
+ * promoting `document.title` costs nothing there and rescues the SPA case.
+ */
+const STRATEGY_WEIGHT: Record<DetectionStrategy, number> = {
+  manual: 120,
+  jsonld: 100,
+  'document-title': 80,
+  og: 78,
+  h1: 60,
+  breadcrumb: 40,
+  slug: 30,
+};
+
+const GENERIC_DOMAIN_PARTS = new Set([
+  'www', 'com', 'net', 'org', 'co', 'io', 'tv', 'me', 'to', 'cc', 'xyz', 'so',
+  'app', 'site', 'online', 'stream', 'watch', 'movies', 'ru', 'in', 'uk', 'is',
+]);
+
+function normalizeForCompare(text: string): string {
+  return text.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
+}
+
+/** Brand words derived from the hostname — "cineby.cc" yields {cineby}. */
+export function brandTokens(hostname: string): Set<string> {
+  const tokens = new Set<string>();
+  for (const part of hostname.toLowerCase().split('.')) {
+    if (!part || GENERIC_DOMAIN_PARTS.has(part)) continue;
+    tokens.add(part);
+  }
+  return tokens;
+}
+
+function scoreCandidate(candidate: PageMetaResult, brands: Set<string>): number {
+  let score = STRATEGY_WEIGHT[candidate.strategy] ?? 0;
+  const normalized = normalizeForCompare(candidate.rawTitle);
+
+  // The site's own name is never what's playing. This is what made a
+  // client-rendered site report "Cineby" as the film.
+  if (brands.has(normalized)) return -1000;
+  for (const brand of brands) {
+    if (brand.length >= 4 && normalized.length <= brand.length + 4 && normalized.includes(brand)) {
+      score -= 500;
+    }
+  }
+
+  if (/\b(19\d{2}|20\d{2})\b/.test(candidate.rawTitle)) score += 15;
+  if (/\bS\d{1,2}\s*E\d{1,3}\b/i.test(candidate.rawTitle)) score += 10;
+  if (candidate.yearHint !== undefined) score += 10;
+  if (normalized.length < 3) score -= 50;
+
+  return score;
+}
+
+/**
+ * Order candidates by how likely they are to be the thing being watched.
+ *
+ * Ranking rather than taking the first hit matters because the most structured
+ * source isn't always the most truthful one.
+ */
+export function rankCandidates(
+  candidates: PageMetaResult[],
+  hostname: string,
+): PageMetaResult[] {
+  const brands = brandTokens(hostname);
+  return candidates
+    .map((candidate, index) => ({ candidate, index, score: scoreCandidate(candidate, brands) }))
+    .sort((a, b) => b.score - a.score || a.index - b.index)
+    .map((entry) => entry.candidate);
+}

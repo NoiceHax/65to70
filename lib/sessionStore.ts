@@ -1,7 +1,8 @@
 import { browser } from 'wxt/browser';
 import { coverageRatio, db, emptyCoverage, isComplete } from './db';
 import { cleanTitle, isUsableTitle, type CleanedTitle } from './titleClean';
-import type { PageMetaResult } from './pageMeta';
+import { rankCandidates, type PageMetaResult } from './pageMeta';
+import type { UrlIdCandidate } from './urlIds';
 import type { MediaProgressMessage, PageMetaMessage } from './messages';
 import type { PendingDetection, Session } from './types';
 
@@ -31,6 +32,8 @@ interface TabState {
   metaTop?: PageMetaResult[];
   /** Metadata from a subframe, used only when the top frame offered none. */
   metaSub?: PageMetaResult[];
+  /** Catalogue ids read from the URL, top frame preferred. */
+  urlIds?: UrlIdCandidate[];
 }
 
 const tabKey = (tabId: number) => `tab:${tabId}`;
@@ -52,13 +55,16 @@ export async function clearTabState(tabId: number): Promise<void> {
 /**
  * Best usable title for a tab.
  *
- * Candidates arrive already ordered most-structured-first, but structure isn't
- * the same as usefulness — a JSON-LD `name` of "Player" loses to a keyword-
- * stuffed `og:title` that still contains the film. So take the first candidate
- * that survives cleaning rather than the first candidate outright.
+ * Discovery order is not preference order — the most structured source is not
+ * always the most truthful. A client-rendered site bakes its brand name into
+ * `og:title` on every page, so ranking has to demote it below the live
+ * `document.title` and reject anything that is just the site's own name.
  */
 export function bestTitle(state: TabState): (CleanedTitle & { raw: string }) | null {
-  const candidates = [...(state.metaTop ?? []), ...(state.metaSub ?? [])];
+  const candidates = rankCandidates(
+    [...(state.metaTop ?? []), ...(state.metaSub ?? [])],
+    state.hostname ?? '',
+  );
 
   for (const candidate of candidates) {
     const cleaned = cleanTitle(candidate.rawTitle);
@@ -81,9 +87,15 @@ export async function handlePageMeta(tabId: number, msg: PageMetaMessage): Promi
     state.metaTop = msg.candidates;
     state.url = msg.url;
     state.hostname = msg.hostname;
+    if (msg.urlIds.length > 0) state.urlIds = msg.urlIds;
   } else {
     state.metaSub = msg.candidates;
     state.hostname ??= msg.hostname;
+    // A subframe's URL is the embed URL, which often carries the id even when
+    // the parent page's URL does not.
+    if (msg.urlIds.length > 0 && (state.urlIds ?? []).length === 0) {
+      state.urlIds = msg.urlIds;
+    }
   }
 
   await setTabState(tabId, state);
@@ -173,8 +185,15 @@ export async function handleMediaProgress(
     site: msg.hostname,
     title: title?.title ?? '(no title found)',
     year: title?.year,
+    urlIds: (state.urlIds ?? []).map((i) => `${i.source}:${i.id}`).join(', ') || '(none)',
     coverage: `${Math.round(coverageRatio(coverage) * 100)}%`,
     complete: nowComplete,
+    // Every candidate, so a wrong pick can be diagnosed without guessing which
+    // source produced it.
+    candidates: rankCandidates(
+      [...(state.metaTop ?? []), ...(state.metaSub ?? [])],
+      state.hostname ?? '',
+    ).map((c) => `${c.strategy}="${c.rawTitle}"`),
   });
 }
 
@@ -194,28 +213,38 @@ async function createPending(
   if (existing > 0) return;
 
   const title = bestTitle(state);
-  if (!title) {
-    // Tier 3 territory: playback completed but no title could be read. M4's
-    // onboarding surface will ask the user once and remember the answer.
-    console.warn('[keeper] completed session with no readable title', { hostname });
+  const urlIds = state.urlIds ?? [];
+
+  // A URL-borne catalogue id is enough on its own. Client-rendered sites are
+  // exactly the case where no readable title exists, and they're also the ones
+  // most likely to key their pages on a TMDB id.
+  if (!title && urlIds.length === 0) {
+    // Tier 3 territory: playback completed, nothing identifiable on the page.
+    // M4's onboarding surface will ask the user once and remember the answer.
+    console.warn('[keeper] completed session with nothing identifiable', { hostname });
     return;
   }
 
   const pending: PendingDetection = {
     sessionId,
-    rawTitle: title.raw,
-    cleanedTitle: title.title,
-    year: title.year,
-    season: title.season,
-    episode: title.episode,
+    rawTitle: title?.raw ?? '',
+    cleanedTitle: title?.title ?? '',
+    year: title?.year,
+    season: title?.season ?? urlIds.find((i) => i.season !== undefined)?.season,
+    episode: title?.episode ?? urlIds.find((i) => i.episode !== undefined)?.episode,
     hostname,
     candidates: [], // Populated by the resolver in M2.
+    urlIds,
     detectedAt: Date.now(),
     status: 'awaiting',
   };
 
   await db.pending.add(pending);
-  console.log('[keeper] queued for confirmation:', pending.cleanedTitle, pending.year ?? '');
+  console.log(
+    '[keeper] queued for confirmation:',
+    pending.cleanedTitle || `(by id ${urlIds.map((i) => `${i.source}:${i.id}`).join(', ')})`,
+    pending.year ?? '',
+  );
 }
 
 /** Close out any session still open for a tab that's gone. */

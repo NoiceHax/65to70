@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from 'vitest';
-import { extractPageMeta } from '@/lib/pageMeta';
+import { brandTokens, extractPageMeta, rankCandidates } from '@/lib/pageMeta';
 import { cleanTitle } from '@/lib/titleClean';
 
 function docFrom(html: string): Document {
@@ -111,6 +111,65 @@ describe('extractPageMeta', () => {
 
     const titles = extractPageMeta(docFrom(html), 'https://example.com/heat');
     expect(titles.filter((c) => c.rawTitle === 'Heat')).toHaveLength(1);
+  });
+});
+
+describe('brandTokens', () => {
+  it('drops the TLD and www', () => {
+    expect([...brandTokens('cineby.cc')]).toEqual(['cineby']);
+    expect([...brandTokens('www.fmovies.to')]).toEqual(['fmovies']);
+  });
+});
+
+describe('rankCandidates', () => {
+  it('rejects a candidate that is just the site name', () => {
+    // The actual failure on a client-rendered site: og:title was baked into the
+    // app shell as the brand and never updated per page.
+    const ranked = rankCandidates(
+      [
+        { rawTitle: 'Cineby', strategy: 'og' },
+        { rawTitle: 'Paldo Script', strategy: 'h1' },
+        { rawTitle: 'Weapons (2025)', strategy: 'document-title' },
+      ],
+      'cineby.cc',
+    );
+
+    expect(ranked[0].rawTitle).toBe('Weapons (2025)');
+    expect(ranked[ranked.length - 1].rawTitle).toBe('Cineby');
+  });
+
+  it('prefers document.title over a stale og:title', () => {
+    const ranked = rankCandidates(
+      [
+        { rawTitle: 'SomeSite - Free Movies', strategy: 'og' },
+        { rawTitle: 'Arrival (2016)', strategy: 'document-title' },
+      ],
+      'somesite.to',
+    );
+    expect(ranked[0].strategy).toBe('document-title');
+  });
+
+  it('still puts JSON-LD first when it is present and not the brand', () => {
+    const ranked = rankCandidates(
+      [
+        { rawTitle: 'Interstellar', strategy: 'jsonld' },
+        { rawTitle: 'Interstellar (2014) Watch Free', strategy: 'document-title' },
+      ],
+      'example.to',
+    );
+    expect(ranked[0].strategy).toBe('jsonld');
+  });
+
+  it('does not penalise a real title that merely contains the brand', () => {
+    // "Cinema Paradiso" on cinema.to should not be treated as the site's name.
+    const ranked = rankCandidates(
+      [
+        { rawTitle: 'Cinema Paradiso (1988)', strategy: 'og' },
+        { rawTitle: 'Cinema', strategy: 'h1' },
+      ],
+      'cinema.to',
+    );
+    expect(ranked[0].rawTitle).toBe('Cinema Paradiso (1988)');
   });
 });
 
