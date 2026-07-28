@@ -132,6 +132,19 @@ describe('parseJwSecondary', () => {
     expect(parseJwSecondary('2008 S3:E12 22m')).toMatchObject({ season: 3, episode: 12 });
   });
 
+  it('reads the spelled-out episode form', () => {
+    expect(parseJwSecondary('Season 3: Episode 12')).toMatchObject({ season: 3, episode: 12 });
+  });
+
+  it('reads the 3x12 form', () => {
+    expect(parseJwSecondary('2008 3x12 22m')).toMatchObject({ season: 3, episode: 12 });
+  });
+
+  it('does not read a runtime as an episode', () => {
+    // "1h 46m" must not become season 1, episode 46.
+    expect(parseJwSecondary('2024 U/A 13+ 1h 46m').season).toBeUndefined();
+  });
+
   it('returns nothing useful for an empty line', () => {
     expect(parseJwSecondary('')).toEqual({});
   });

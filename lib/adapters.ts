@@ -209,10 +209,31 @@ export function parseJwSecondary(text: string): {
     out.runtimeMinutes = Number(minutesOnly[1]);
   }
 
-  const episode = text.match(/\bS(\d{1,2})\s*[·:•|-]?\s*E(\d{1,3})\b/i);
-  if (episode) {
-    out.season = Number(episode[1]);
-    out.episode = Number(episode[2]);
+  /*
+   * Several shapes, because the real one isn't known.
+   *
+   * The only sample available was a film, where this line reads "2024 U/A 13+
+   * 1h 46m" and carries no episode at all. Rather than guess one format and
+   * silently fail on the others, all the plausible ones are accepted — they're
+   * distinctive enough not to collide with each other or with a runtime.
+   */
+  const episodePatterns = [
+    /\bS(\d{1,2})\s*[·:•|-]?\s*E(\d{1,3})\b/i,
+    /\bSeason\s+(\d{1,2})\s*[·:•|,-]?\s*Episode\s+(\d{1,3})\b/i,
+    /\b(\d{1,2})\s*x\s*(\d{2,3})\b/,
+  ];
+
+  for (const pattern of episodePatterns) {
+    const match = text.match(pattern);
+    if (!match) continue;
+
+    const season = Number(match[1]);
+    const episode = Number(match[2]);
+    if (season < 1 || season > 50 || episode < 1) continue;
+
+    out.season = season;
+    out.episode = episode;
+    break;
   }
 
   return out;
