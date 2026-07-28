@@ -88,4 +88,40 @@ describe('JioHotstar', () => {
     );
     expect(meta?.rawTitle).toBe('inception');
   });
+
+  it('reads season and episode from the URL', () => {
+    // This adapter emitted only the show name, so every episode resolved to
+    // the same title and the episode count never moved off one.
+    const meta = readAdapterMeta(
+      docFrom('<body></body>'),
+      'https://www.hotstar.com/in/shows/how-i-met-your-mother/123/season-2/episode-7/watch',
+      'www.hotstar.com',
+    );
+
+    expect(cleanTitle(meta!.rawTitle)).toMatchObject({
+      title: 'how i met your mother',
+      season: 2,
+      episode: 7,
+      mediaType: 'tv',
+    });
+  });
+
+  it('falls back to an episode marker in the page', () => {
+    const meta = readAdapterMeta(
+      docFrom('<body><div class="player-title">How I Met Your Mother</div><span>S3 E12</span></body>'),
+      'https://www.hotstar.com/in/shows/himym/123/456/watch',
+      'www.hotstar.com',
+    );
+
+    expect(cleanTitle(meta!.rawTitle)).toMatchObject({ season: 3, episode: 12 });
+  });
+
+  it('leaves a film without an episode number', () => {
+    const meta = readAdapterMeta(
+      docFrom('<body></body>'),
+      'https://www.hotstar.com/in/movies/inception/1260022016/watch',
+      'www.hotstar.com',
+    );
+    expect(cleanTitle(meta!.rawTitle).season).toBeUndefined();
+  });
 });

@@ -1,4 +1,5 @@
 import type { PageMetaResult } from './pageMeta';
+import { seasonEpisodeFromUrl } from './urlIds';
 
 /**
  * Tier 1 — per-platform readers.
@@ -27,6 +28,34 @@ export interface SiteAdapter {
 function text(doc: Document, selector: string): string | null {
   const value = doc.querySelector(selector)?.textContent?.trim();
   return value && value.length > 0 ? value : null;
+}
+
+/**
+ * An "S3 E12" label somewhere in the player chrome.
+ *
+ * Checked element by element rather than against the whole page's text.
+ * Concatenated text nodes run together — "How I Met Your MotherS3 E12" — and a
+ * word-boundary match then fails on the very case it was written for. Looking
+ * at each element's own text sidesteps that and is more precise besides:
+ * matching only short, label-shaped strings avoids picking a number out of a
+ * synopsis.
+ */
+function findEpisodeMarker(doc: Document): { season: number; episode: number } | null {
+  const pattern = /^S\s?(\d{1,2})\s*[·:•|-]?\s*E\s?(\d{1,3})\b/i;
+
+  for (const element of Array.from(doc.querySelectorAll('span, div, p, h1, h2, h3'))) {
+    const text = element.textContent?.trim();
+    if (!text || text.length > 24) continue;
+
+    const match = text.match(pattern);
+    if (!match) continue;
+
+    const season = Number(match[1]);
+    const episode = Number(match[2]);
+    if (season >= 1 && season <= 50 && episode >= 1) return { season, episode };
+  }
+
+  return null;
 }
 
 /** Fold structured season/episode into the form cleanTitle already parses. */
@@ -130,7 +159,22 @@ const hotstar: SiteAdapter = {
     const title = fromPlayer ?? fromSlug;
     if (!title || title.length < 2) return null;
 
-    return { rawTitle: title, strategy: 'manual' };
+    /*
+     * Series need their episode, and this adapter never read one — so every
+     * episode of a show resolved to the same title and the count never moved
+     * off one.
+     *
+     * The URL is checked first because it survives the player chrome not having
+     * rendered. Failing that, the page is scanned for an "S1 E3" marker, which
+     * is how the player labels episodes.
+     */
+    const fromUrl = seasonEpisodeFromUrl(url);
+    const marker = fromUrl ? null : findEpisodeMarker(doc);
+
+    const season = fromUrl?.season ?? marker?.season;
+    const episode = fromUrl?.episode ?? marker?.episode;
+
+    return { rawTitle: withEpisode(title, season, episode), strategy: 'manual' };
   },
 };
 

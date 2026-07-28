@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { extractUrlIds } from '@/lib/urlIds';
+import { extractUrlIds, seasonEpisodeFromUrl } from '@/lib/urlIds';
 
 describe('extractUrlIds — bare path ids', () => {
   it('reads the id from a neutral /watch/<id> path', () => {
@@ -55,6 +55,43 @@ describe('extractUrlIds — explicit query parameters', () => {
   it('reads season and episode alongside it', () => {
     const [id] = extractUrlIds('https://example.com/embed?tmdb=1399&season=1&episode=2');
     expect(id).toMatchObject({ mediaType: 'tv', season: 1, episode: 2 });
+  });
+});
+
+describe('seasonEpisodeFromUrl', () => {
+  it('reads a spelled-out season and episode path', () => {
+    // Hotstar's shape. Without this, every episode of a show resolved to the
+    // same title and the episode count never moved off one.
+    expect(
+      seasonEpisodeFromUrl('https://www.hotstar.com/in/shows/himym/123/season-2/episode-7/watch'),
+    ).toEqual({ season: 2, episode: 7 });
+  });
+
+  it('reads the compact s01e03 form', () => {
+    expect(seasonEpisodeFromUrl('https://example.com/watch/show-s01e03')).toEqual({
+      season: 1,
+      episode: 3,
+    });
+  });
+
+  it('reads query parameters', () => {
+    expect(seasonEpisodeFromUrl('https://example.com/embed?season=4&episode=12')).toEqual({
+      season: 4,
+      episode: 12,
+    });
+  });
+
+  it('returns null when there is nothing to read', () => {
+    expect(seasonEpisodeFromUrl('https://example.com/movie/inception')).toBeNull();
+  });
+
+  it('rejects out-of-range numbers', () => {
+    expect(seasonEpisodeFromUrl('https://example.com/season-99/episode-1')).toBeNull();
+  });
+
+  it('fills the episode onto an id found elsewhere in the URL', () => {
+    const [id] = extractUrlIds('https://example.com/watch/1399?season=2&episode=5');
+    expect(id).toMatchObject({ id: '1399', mediaType: 'tv', season: 2, episode: 5 });
   });
 });
 

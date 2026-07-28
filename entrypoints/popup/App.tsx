@@ -4,11 +4,12 @@ import ConfirmQueue from './views/ConfirmQueue';
 import Library from './views/Library';
 import Watchlist from './views/Watchlist';
 import WatchNext from './views/WatchNext';
+import Discover from './views/Discover';
 import Sites from './views/Sites';
 import TrackingNow from './views/TrackingNow';
 import './App.css';
 
-type Tab = 'queue' | 'watchlist' | 'library' | 'sites';
+type Tab = 'queue' | 'discover' | 'watchlist' | 'library' | 'sites';
 
 function App() {
   const [tab, setTab] = useState<Tab>('sites');
@@ -51,8 +52,11 @@ function App() {
           Confirm
           {pendingCount > 0 && <span className="count">{pendingCount}</span>}
         </button>
+        <button className={tab === 'discover' ? 'on' : ''} onClick={() => setTab('discover')}>
+          For you
+        </button>
         <button className={tab === 'watchlist' ? 'on' : ''} onClick={() => setTab('watchlist')}>
-          Watchlist
+          List
         </button>
         <button className={tab === 'library' ? 'on' : ''} onClick={() => setTab('library')}>
           Watched
@@ -63,6 +67,7 @@ function App() {
       </nav>
 
       {tab === 'queue' && <ConfirmQueue key={version} onChange={bump} />}
+      {tab === 'discover' && <Discover key={version} />}
       {tab === 'watchlist' && (
         <>
           <WatchNext key={`next-${version}`} />

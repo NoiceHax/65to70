@@ -8,6 +8,12 @@ import {
   saveAvailabilityIndex,
   type AvailabilityIndex,
 } from '@/lib/providers';
+import {
+  clearSimilarIndex,
+  saveSimilarIndex,
+  similarIndexStatus,
+  type SimilarIndex,
+} from '@/lib/similar';
 import { buildDiaryCsv } from '@/lib/sync/letterboxd';
 import {
   disconnect,
@@ -29,6 +35,7 @@ function App() {
   const [counts, setCounts] = useState({ movies: 0, sessions: 0, pending: 0 });
   const [titleIndex, setTitleIndex] = useState({ loaded: false, titles: 0 });
   const [availability, setAvailability] = useState({ loaded: false, titles: 0, region: '' });
+  const [similar, setSimilar] = useState({ loaded: false, titles: 0 });
   const [indexError, setIndexError] = useState<string | null>(null);
   const [connected, setConnected] = useState({ simkl: false, trakt: false });
   const [grant, setGrant] = useState<{ provider: SyncProvider; code: DeviceCodeGrant } | null>(
@@ -45,6 +52,7 @@ function App() {
     });
     setTitleIndex(await titleIndexStatus());
     setAvailability(await availabilityStatus());
+    setSimilar(await similarIndexStatus());
     setConnected({
       simkl: await isConnected('simkl'),
       trakt: await isConnected('trakt'),
@@ -113,7 +121,7 @@ function App() {
     setSyncNote(`${rows} diary entries exported.`);
   };
 
-  const loadIndexFile = async (file: File, kind: 'titles' | 'availability') => {
+  const loadIndexFile = async (file: File, kind: 'titles' | 'availability' | 'similar') => {
     setIndexError(null);
     try {
       const parsed = JSON.parse(await file.text());
@@ -121,6 +129,10 @@ function App() {
       if (kind === 'titles') {
         if (!Array.isArray(parsed.entries)) throw new Error('Not a title index file.');
         await saveTitleIndex(parsed);
+      } else if (kind === 'similar') {
+        const index = parsed as SimilarIndex;
+        if (!index.similar || !index.titles) throw new Error('Not a similarity file.');
+        await saveSimilarIndex(index);
       } else {
         const index = parsed as AvailabilityIndex;
         if (!index.region || !index.titles) throw new Error('Not an availability file.');
@@ -404,6 +416,40 @@ function App() {
               <button
                 onClick={async () => {
                   await clearAvailabilityIndex(availability.region);
+                  await refresh();
+                }}
+              >
+                Remove
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="index-row">
+          <div>
+            <strong>Recommendations</strong>
+            <em>
+              {similar.loaded
+                ? `${similar.titles.toLocaleString()} titles with relationships — suggestions run offline`
+                : 'Not loaded. The "For you" tab has nothing to work from.'}
+            </em>
+          </div>
+          <div className="index-actions">
+            <label className="file">
+              Load
+              <input
+                type="file"
+                accept="application/json"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) void loadIndexFile(file, 'similar');
+                }}
+              />
+            </label>
+            {similar.loaded && (
+              <button
+                onClick={async () => {
+                  await clearSimilarIndex();
                   await refresh();
                 }}
               >

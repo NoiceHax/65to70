@@ -53,6 +53,46 @@ function isPlausibleSeasonEpisode(value: string): boolean {
   return /^\d{1,3}$/.test(value);
 }
 
+/**
+ * Season and episode numbers written into a URL.
+ *
+ * Services spell this out in the path — `/season-1/episode-3/`, `/s01e03/`,
+ * `?season=1&episode=3` — even when the page itself only shows the series name.
+ * Without reading it, every episode of a show resolves to the same thing and
+ * the episode count never moves off one.
+ */
+export function seasonEpisodeFromUrl(
+  url: string,
+): { season: number; episode: number } | null {
+  const patterns = [
+    /season[-_/](\d{1,2})[-_/]+episode[-_/](\d{1,3})/i,
+    /[/-]s(\d{1,2})[/-]?e(\d{1,3})\b/i,
+    /\bs(\d{1,2})e(\d{1,3})\b/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = url.match(pattern);
+    if (!match) continue;
+
+    const season = Number(match[1]);
+    const episode = Number(match[2]);
+    if (season >= 1 && season <= 50 && episode >= 1 && episode <= 999) {
+      return { season, episode };
+    }
+  }
+
+  try {
+    const params = new URL(url).searchParams;
+    const season = Number(params.get('season'));
+    const episode = Number(params.get('episode'));
+    if (season >= 1 && episode >= 1) return { season, episode };
+  } catch {
+    // Not a URL we can parse; the patterns above already had their chance.
+  }
+
+  return null;
+}
+
 export function extractUrlIds(url: string): UrlIdCandidate[] {
   let parsed: URL;
   try {
@@ -139,6 +179,20 @@ export function extractUrlIds(url: string): UrlIdCandidate[] {
       (candidate.mediaType !== undefined && existing.mediaType === undefined) ||
       (candidate.season !== undefined && existing.season === undefined);
     if (better) best.set(key, candidate);
+  }
+
+  // Fill in episode numbers written elsewhere in the URL. A path like
+  // /watch/1399?season=2&episode=5 gives the id in one place and the episode
+  // in another, and taking only the first identifies the show but never the
+  // episode.
+  const spelledOut = seasonEpisodeFromUrl(url);
+  if (spelledOut) {
+    for (const candidate of best.values()) {
+      if (candidate.season !== undefined) continue;
+      candidate.season = spelledOut.season;
+      candidate.episode = spelledOut.episode;
+      candidate.mediaType = 'tv';
+    }
   }
 
   return [...best.values()];
