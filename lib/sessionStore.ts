@@ -45,6 +45,8 @@ interface TabState {
 
   /** Cross-origin iframe origins seen on the page, for the diagnostics panel. */
   embeddedFrames?: EmbeddedFrame[];
+  /** What has already been queued for this tab, so it isn't queued twice. */
+  queuedSignature?: string;
   /** Whether any injected frame reported a usable media element. */
   sawVideo?: boolean;
   lastSeenUrl?: string;
@@ -142,6 +144,88 @@ export async function handlePageMeta(tabId: number, msg: PageMetaMessage): Promi
   }
 
   await setTabState(tabId, state);
+  await maybeQueueFromPage(tabId, state, msg);
+}
+
+/**
+ * Does this page look like something is being watched on it?
+ *
+ * Any one of these is enough. A catalogue id in the URL, a media element, or an
+ * embedded player all say the same thing in different ways, and requiring more
+ * than one would rule out exactly the sites that only manage one.
+ */
+function looksLikeWatchPage(msg: PageMetaMessage): boolean {
+  if (msg.hasVideo) return true;
+  if (msg.urlIds.length > 0) return true;
+  if (msg.embeddedFrames.some((frame) => frame.likelyPlayer)) return true;
+  return /[/?&](watch|play)\b/i.test(msg.url);
+}
+
+/**
+ * Queue a title from page data alone, without waiting for playback.
+ *
+ * Everything used to be gated behind finding a `<video>`, which meant a page
+ * whose title had been read perfectly well produced nothing at all — the
+ * element was in a closed shadow root, or a frame that couldn't be reached, and
+ * the identification was thrown away with it.
+ *
+ * That is the wrong priority. Knowing *what* is being watched is the point;
+ * measuring how much of it was watched is a refinement. So identification now
+ * stands on its own, and coverage attaches to the same session later if a media
+ * element ever does turn up.
+ */
+async function maybeQueueFromPage(
+  tabId: number,
+  state: TabState,
+  msg: PageMetaMessage,
+): Promise<void> {
+  if (!looksLikeWatchPage(msg)) return;
+
+  const title = bestTitle(state);
+  const urlIds = state.urlIds ?? [];
+  if (!title && urlIds.length === 0) return;
+
+  // One entry per identification per tab. Navigating between films re-queues;
+  // a page re-rendering itself does not.
+  const signature =
+    urlIds.length > 0
+      ? urlIds.map((id) => `${id.source}:${id.id}`).join(',')
+      : `${title!.title}:${title!.year ?? ''}`;
+
+  if (state.queuedSignature === signature) return;
+
+  /*
+   * A different film in the same tab gets its own session.
+   *
+   * Without this the second film reuses the first one's session, and a session
+   * that already carries a queued entry is never queued again — so the title is
+   * read correctly, matched correctly, and then dropped on the floor without a
+   * word. Watching two things in one tab is completely ordinary, so this was
+   * not an edge case.
+   */
+  if (state.sessionId !== undefined && state.queuedSignature !== undefined) {
+    await endSession(state.sessionId);
+    state.sessionId = undefined;
+    state.durationSec = undefined;
+  }
+
+  state.queuedSignature = signature;
+
+  if (state.sessionId === undefined) {
+    const now = Date.now();
+    state.sessionId = (await db.sessions.add({
+      titleKey: null,
+      mediaType: title?.mediaType ?? 'movie',
+      startedAt: now,
+      lastSeenAt: now,
+      coverage: emptyCoverage(),
+      site: msg.hostname,
+      complete: 0,
+    })) as number;
+  }
+
+  await setTabState(tabId, state);
+  await createPending(state, state.sessionId, msg.hostname, tabId);
 }
 
 async function endSession(sessionId: number): Promise<void> {
@@ -150,8 +234,16 @@ async function endSession(sessionId: number): Promise<void> {
 
   await db.sessions.update(sessionId, { stoppedAt: Date.now() });
 
-  // Drop rows for glances and mis-fires so the database doesn't fill with noise.
-  if (session.complete === 0 && coverageRatio(session.coverage) < MIN_MEANINGFUL_RATIO) {
+  // Drop rows for glances and mis-fires so the database doesn't fill with
+  // noise — but never one the user has been asked to confirm. Sessions created
+  // from page data alone carry no coverage by design, and pruning those would
+  // delete the identification along with them.
+  const queued = await db.pending.where('sessionId').equals(sessionId).count();
+  if (
+    queued === 0 &&
+    session.complete === 0 &&
+    coverageRatio(session.coverage) < MIN_MEANINGFUL_RATIO
+  ) {
     await db.sessions.delete(sessionId);
   }
 }
