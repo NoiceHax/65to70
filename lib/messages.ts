@@ -55,9 +55,18 @@ export interface EmbeddedFrame {
 
 export interface MediaProgressMessage {
   type: 'media-progress';
-  /** Coverage bucket indices newly played since the last report. */
-  buckets: number[];
+  /**
+   * Raw playback positions sampled since the last report, in seconds.
+   *
+   * Positions rather than pre-computed coverage buckets, because the runtime
+   * needed to turn one into the other often isn't known in the page. Streaming
+   * players report `duration` as NaN with an empty `seekable` range, and the
+   * only reliable runtime comes from the catalogue entry the background
+   * resolves — so the background is where that conversion belongs.
+   */
+  samples: number[];
   currentTimeSec: number;
+  /** The player's own figure. 0 when it won't say. */
   durationSec: number;
   url: string;
   hostname: string;

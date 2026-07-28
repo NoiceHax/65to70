@@ -8,6 +8,14 @@ import { COVERAGE_BUCKETS } from './types';
  * marking a film watched.
  */
 
+/**
+ * How often playback position is sampled.
+ *
+ * Shared, because the content script samples at this rate and the background
+ * relies on that spacing to tell ordinary playback from a seek.
+ */
+export const SAMPLE_INTERVAL_MS = 5_000;
+
 /** The parts of a media element this module needs. Keeps it testable. */
 export interface DurationSource {
   duration: number;

@@ -3,7 +3,7 @@ import { extractPageMeta } from '@/lib/pageMeta';
 import { readAdapterMeta } from '@/lib/adapters';
 import { PLAYER_URL } from '@/lib/frames';
 import { extractUrlIds } from '@/lib/urlIds';
-import { bucketIndex, bucketsCovered, effectiveDuration } from '@/lib/progress';
+import { effectiveDuration } from '@/lib/progress';
 import { showToast } from '@/lib/toast';
 import type {
   ConfirmPromptMessage,
@@ -37,6 +37,8 @@ const META_POLL_MS = 3_000;
  * sitcom episode.
  */
 const MIN_DURATION_SEC = 300;
+/** Elapsed playback that stands in for runtime when the player won't report it. */
+const MIN_PLAYBACK_SEC = 60;
 /** A duration change beyond this means the player switched media (or an ad ran). */
 const DURATION_EPSILON_SEC = 5;
 
@@ -45,8 +47,7 @@ const isTopFrame = window.top === window;
 let media: HTMLVideoElement | null = null;
 let trackedDuration = 0;
 let lastSampleAt = 0;
-let lastSampleBucket = -1;
-let pendingBuckets = new Set<number>();
+let pendingSamples: number[] = [];
 let reportTimer: ReturnType<typeof setInterval> | null = null;
 
 let lastMetaSignature = '';
@@ -59,49 +60,59 @@ function send(message: PageMetaMessage | MediaProgressMessage): void {
   browser.runtime.sendMessage(message).catch(() => {});
 }
 
-function usableDuration(el: HTMLVideoElement): boolean {
-  return effectiveDuration(el) >= MIN_DURATION_SEC;
+/**
+ * Whether this element is the feature rather than an advert or a preview.
+ *
+ * Runtime is the obvious test and often unavailable: streaming players report
+ * `duration` as NaN with an empty `seekable` range, and a real film was being
+ * discarded as too short on that basis alone.
+ *
+ * So when the runtime is unknown, sustained playback stands in for it. Adverts
+ * and preview loops are short; a minute of actual elapsed playback is a strong
+ * signal this is the thing being watched. The background discards it later if
+ * the title never resolves.
+ */
+function looksLikeContent(el: HTMLVideoElement): boolean {
+  const known = effectiveDuration(el);
+  if (known >= MIN_DURATION_SEC) return true;
+  if (known === 0 && el.currentTime >= MIN_PLAYBACK_SEC) return true;
+  return false;
 }
 
-function recordCoverage(el: HTMLVideoElement, now: number): void {
-  // Deliberately the duration captured at attach time, not a fresh reading.
-  // A seekable range can grow while buffering, and re-deriving it every sample
-  // would shift what each bucket means partway through the film.
-  const bucket = bucketIndex(el.currentTime, trackedDuration);
-  const covered = bucketsCovered(
-    lastSampleBucket >= 0 ? lastSampleBucket : null,
-    bucket,
-    now - lastSampleAt,
-    SAMPLE_INTERVAL_MS,
-  );
-
-  for (const index of covered) pendingBuckets.add(index);
-
-  lastSampleBucket = bucket;
+/**
+ * Record where playback currently is.
+ *
+ * Just the position — no coverage maths here. Turning positions into coverage
+ * needs the runtime, and on these players the runtime often isn't knowable in
+ * the page at all. The background has the resolved catalogue entry, so it has
+ * the runtime, so it does the conversion.
+ */
+function recordSample(el: HTMLVideoElement, now: number): void {
+  pendingSamples.push(el.currentTime);
   lastSampleAt = now;
 }
 
 function flush(ended: boolean): void {
   if (!media) return;
-  if (pendingBuckets.size === 0 && !ended) return;
+  if (pendingSamples.length === 0 && !ended) return;
 
   const message: MediaProgressMessage = {
     type: 'media-progress',
-    buckets: Array.from(pendingBuckets),
+    samples: pendingSamples,
     currentTimeSec: media.currentTime,
-    durationSec: trackedDuration || media.duration,
+    durationSec: trackedDuration || 0,
     url: location.href,
     hostname: location.hostname,
     isTopFrame,
     ended,
   };
 
-  pendingBuckets = new Set();
+  pendingSamples = [];
   send(message);
 }
 
 function onTimeUpdate(): void {
-  if (!media || !usableDuration(media)) return;
+  if (!media || !looksLikeContent(media)) return;
 
   // An ad break or a switch to the next episode replaces the media on the same
   // element. Close out the old session rather than merging two films.
@@ -115,13 +126,12 @@ function onTimeUpdate(): void {
   if (Math.abs(effectiveDuration(media) - trackedDuration) > changeThreshold) {
     flush(true);
     trackedDuration = effectiveDuration(media);
-    lastSampleBucket = -1;
     lastSampleAt = 0;
   }
 
   const now = Date.now();
   if (now - lastSampleAt < SAMPLE_INTERVAL_MS) return;
-  recordCoverage(media, now);
+  recordSample(media, now);
 }
 
 function onPause(): void {
@@ -140,7 +150,6 @@ function detach(): void {
   media.removeEventListener('ended', onEnded);
   media = null;
   trackedDuration = 0;
-  lastSampleBucket = -1;
   lastSampleAt = 0;
 }
 
@@ -150,7 +159,6 @@ function attach(el: HTMLVideoElement): void {
 
   media = el;
   trackedDuration = effectiveDuration(el);
-  lastSampleBucket = -1;
   lastSampleAt = 0;
 
   el.addEventListener('timeupdate', onTimeUpdate);
@@ -164,7 +172,7 @@ function attach(el: HTMLVideoElement): void {
 
 /** Prefer a video that's actually playing; fall back to the longest one. */
 function pickVideo(): HTMLVideoElement | null {
-  const videos = Array.from(document.querySelectorAll('video')).filter(usableDuration);
+  const videos = Array.from(document.querySelectorAll('video')).filter(looksLikeContent);
   if (videos.length === 0) return null;
 
   const playing = videos.filter((v) => !v.paused && !v.ended);
@@ -178,7 +186,7 @@ let lastReported = '';
 
 function reportState(): void {
   const all = document.querySelectorAll('video').length;
-  const usable = Array.from(document.querySelectorAll('video')).filter(usableDuration).length;
+  const usable = Array.from(document.querySelectorAll('video')).filter(looksLikeContent).length;
   const frames = embeddedFrames();
 
   const state = `${all}:${usable}:${frames.map((f) => f.origin).join(',')}:${media ? 'attached' : 'none'}`;

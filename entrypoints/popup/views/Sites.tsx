@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import { browser } from 'wxt/browser';
 import {
+  ALL_SITES,
   SEARCH_SITES,
   SUGGESTED_SITES,
   grantedOrigins,
+  hasAllSites,
   originPatternFor,
   requestSite,
   revokeSite,
@@ -22,9 +24,11 @@ export default function Sites({ onChange }: { onChange: () => void }) {
   const [tabOrigin, setTabOrigin] = useState<string | null>(null);
   const [tabHost, setTabHost] = useState<string | null>(null);
   const [diagnostics, setDiagnostics] = useState<TabDiagnostics | null>(null);
+  const [allSites, setAllSites] = useState(false);
 
   const refresh = useCallback(async () => {
     setOrigins(await grantedOrigins());
+    setAllSites(await hasAllSites());
 
     const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
     if (tab?.id !== undefined) setDiagnostics(await tabDiagnostics(tab.id));
@@ -60,9 +64,38 @@ export default function Sites({ onChange }: { onChange: () => void }) {
   return (
     <section>
       <h2>Watched sites</h2>
+
+      {/* Off by default and stated plainly. Per-origin grants stay the
+          recommended path, but on sites that load the player from a rotating
+          third-party host they never finish — and asking someone to approve a
+          stream of unfamiliar domains is how ad origins get granted by
+          mistake. */}
+      <label className="check">
+        <input
+          type="checkbox"
+          checked={allSites}
+          onChange={async () => {
+            if (allSites) await revokeSite(ALL_SITES);
+            else await requestSite(ALL_SITES);
+            await refresh();
+            onChange();
+          }}
+        />
+        <span>
+          <strong>Track every site</strong>
+          <em>
+            Needed for sites that load the player from another domain and swap
+            it as you switch servers. Keeper still only ever reads the video
+            element and the page title, and still uploads nothing — but this is
+            broad access, so it is off unless you turn it on.
+          </em>
+        </span>
+      </label>
+
       <p className="note">
-        Keeper only runs on sites you turn on here. Nothing is requested at
-        install.
+        {allSites
+          ? 'Individual sites below are no longer needed, but do no harm.'
+          : 'Keeper only runs on sites you turn on here. Nothing is requested at install.'}
       </p>
 
       {tabOrigin && !isGranted(tabOrigin) && (

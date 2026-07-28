@@ -97,8 +97,17 @@ export interface Session {
   stoppedAt?: number;
 
   coverage: Uint8Array;
-  /** Media duration in seconds, as reported by the player. */
+  /** Media duration in seconds as reported by the player. Often 0 — see below. */
   durationSec?: number;
+  /**
+   * Runtime from the resolved catalogue entry, in seconds.
+   *
+   * The authority when the player won't say. Streaming players routinely report
+   * `duration` as NaN with an empty `seekable` range, so the only dependable
+   * runtime comes from the title we matched — which is also more accurate,
+   * since it isn't inflated by adverts spliced into the stream.
+   */
+  runtimeSec?: number;
 
   /** Hostname the playback happened on. */
   site: string;

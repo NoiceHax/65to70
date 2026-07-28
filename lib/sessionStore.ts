@@ -4,6 +4,7 @@ import { cleanTitle, isUsableTitle, type CleanedTitle } from './titleClean';
 import { rankCandidates, type PageMetaResult } from './pageMeta';
 import { refreshBadge } from './badge';
 import { liveFramesForTab } from './frames';
+import { SAMPLE_INTERVAL_MS, bucketIndex, bucketsCovered } from './progress';
 import type { UrlIdCandidate } from './urlIds';
 import type {
   ConfirmPromptMessage,
@@ -187,6 +188,21 @@ export async function handleMediaProgress(
     };
     state.sessionId = (await db.sessions.add(session)) as number;
     state.durationSec = msg.durationSec;
+
+    /*
+     * Ask as soon as something is playing, not at the end.
+     *
+     * Waiting for the completion threshold meant two hours of silence before
+     * the extension gave any sign it had noticed — and if anything upstream was
+     * wrong, the silence was indistinguishable from being broken. Confirming
+     * identity up front is also simply a better question: "is this Supergirl?"
+     * is answerable while it's on screen.
+     *
+     * Whether it counts as *watched* is still decided by coverage. This settles
+     * what it is, not whether you finished it.
+     */
+    await setTabState(tabId, state);
+    await createPending(state, state.sessionId, msg.hostname, tabId);
   }
 
   const session = await db.sessions.get(state.sessionId);
@@ -197,9 +213,35 @@ export async function handleMediaProgress(
     return;
   }
 
+  /*
+   * Positions become coverage here, not in the page.
+   *
+   * The runtime is what turns one into the other, and the player frequently
+   * cannot supply it — NaN duration, empty seekable range. The resolved
+   * catalogue entry can, and is more accurate anyway, since it isn't inflated
+   * by adverts spliced into the stream. Until something knows the runtime,
+   * positions are simply held; nothing is lost, the conversion just waits.
+   */
+  const runtimeSec =
+    session.runtimeSec && session.runtimeSec > 0
+      ? session.runtimeSec
+      : (session.durationSec ?? 0);
+
   const coverage = new Uint8Array(session.coverage);
-  for (const bucket of msg.buckets) {
-    if (bucket >= 0 && bucket < coverage.length) coverage[bucket] = 1;
+
+  if (runtimeSec > 0) {
+    let previous: number | null = null;
+    for (const sample of msg.samples) {
+      const bucket = bucketIndex(sample, runtimeSec);
+      // Consecutive samples are one interval apart during ordinary playback,
+      // so the span between them was genuinely watched. A seek lands far from
+      // the previous sample and only credits where it landed.
+      const covered = bucketsCovered(previous, bucket, SAMPLE_INTERVAL_MS, SAMPLE_INTERVAL_MS);
+      for (const index of covered) {
+        if (index >= 0 && index < coverage.length) coverage[index] = 1;
+      }
+      previous = bucket;
+    }
   }
 
   const nowComplete = isComplete(coverage);
@@ -212,6 +254,9 @@ export async function handleMediaProgress(
     ...(msg.ended ? { stoppedAt: Date.now() } : {}),
   });
 
+  // Normally the queue entry already exists from detection. This is the
+  // fallback for a session that started before that was the behaviour, or one
+  // whose title only became readable later.
   if (justCompleted) await createPending(state, state.sessionId, msg.hostname, tabId);
 
   if (msg.ended) {
@@ -297,6 +342,13 @@ async function createPending(
     const { resolvePending } = await import('./resolver');
     const outcome = await resolvePending(pendingId);
     console.log('[keeper] resolution:', outcome.status, outcome.message ?? '');
+
+    // The runtime the coverage maths needs. Taken from the catalogue rather
+    // than the player, which frequently cannot supply one at all.
+    if (outcome.movie?.runtime) {
+      await db.sessions.update(sessionId, { runtimeSec: outcome.movie.runtime * 60 });
+      console.log('[keeper] runtime from catalogue:', outcome.movie.runtime, 'min');
+    }
 
     // Ask in the page, while the credits are still rolling — but only when the
     // resolver already knows what it was. Confirming a confident guess is a

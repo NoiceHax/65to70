@@ -68,6 +68,25 @@ function isSearchOrigin(origin: string): boolean {
   return (SEARCH_ORIGINS as readonly string[]).includes(origin);
 }
 
+/** The catch-all grant. */
+export const ALL_SITES = '*://*/*';
+
+/**
+ * Whether the user has opted into tracking every site.
+ *
+ * Per-origin grants are the right default and remain the default. They are
+ * also, on aggregator sites, unworkable: those pages load the player from a
+ * separate host, offer a switcher that changes that host with every click, and
+ * rotate the domains outright every few weeks. Granting them one at a time is a
+ * treadmill, and worse, it trains someone to approve unfamiliar domains — which
+ * is how ad and tracking origins end up granted by mistake.
+ *
+ * So this exists, off by default, stated plainly, and revocable in one click.
+ */
+export async function hasAllSites(): Promise<boolean> {
+  return browser.permissions.contains({ origins: [ALL_SITES] });
+}
+
 export async function grantedOrigins(): Promise<string[]> {
   const perms = await browser.permissions.getAll();
   return perms.origins ?? [];

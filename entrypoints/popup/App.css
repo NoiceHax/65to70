@@ -355,6 +355,31 @@ h2.spaced {
 
 /* Sites ----------------------------------------------------------------- */
 
+.check {
+  display: flex;
+  gap: 8px;
+  margin: 4px 0 10px;
+  cursor: pointer;
+}
+
+.check input {
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.check em {
+  display: block;
+  margin-top: 2px;
+  font-style: normal;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+.note.dim {
+  font-size: 11px;
+  opacity: 0.8;
+}
+
 .sites li {
   padding: 3px 0;
 }

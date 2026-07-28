@@ -105,7 +105,9 @@ export function showToast(options: ToastOptions): void {
   }
 
   const prompt = document.createElement('div');
-  prompt.textContent = 'Finished watching this?';
+  // Asked at detection now, not at the end — so this settles what is playing,
+  // not whether it was finished. Coverage still decides that.
+  prompt.textContent = 'Tracking this — is that right?';
 
   let rating: number | null = null;
   const stars = document.createElement('div');
@@ -132,7 +134,7 @@ export function showToast(options: ToastOptions): void {
 
   const confirm = document.createElement('button');
   confirm.className = 'act primary';
-  confirm.textContent = 'Yes';
+  confirm.textContent = 'Yes, track it';
   confirm.addEventListener('click', () => {
     options.onConfirm(rating);
     close();
