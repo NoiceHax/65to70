@@ -349,12 +349,17 @@ function App() {
       </section>
 
       <section>
-        <h2>Offline indexes</h2>
+        <h2>Offline data</h2>
         <p className="note">
-          Prepared data files that let Keeper work without asking TMDB anything.
-          Build them with the scripts in <code>pipeline/</code>, then load them
-          here. They contain no personal data and are the same for everyone in a
-          region.
+          These let Keeper identify titles, say where things are streaming, and
+          suggest films without asking anything online. They ship inside the
+          extension and load themselves — there is nothing to do here unless
+          something says it&apos;s missing.
+        </p>
+        <p className="hint">
+          Missing? Run <code>npm run data</code>, then <code>npm run build</code>{' '}
+          and reload the extension. The files carry no personal data and are the
+          same for everyone in a region.
         </p>
 
         <div className="index-row">

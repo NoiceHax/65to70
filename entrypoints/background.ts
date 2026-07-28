@@ -6,18 +6,25 @@ import { invalidateLibrarySnapshot, librarySnapshot } from '@/lib/librarySnapsho
 import { addFromSearch, offerFromSearch } from '@/lib/searchIntent';
 import { confirmCandidate, dismissPending } from '@/lib/resolver';
 import { refreshBadge } from '@/lib/badge';
+import { loadBundledIndexes } from '@/lib/bundledIndexes';
 import type { KeeperMessage } from '@/lib/messages';
 
 export default defineBackground(() => {
   // Runtime content-script registrations persist across browser restarts, so
   // these calls exist to repair drift — e.g. the user revoked a site through
   // Chrome's own permissions UI rather than ours.
-  browser.runtime.onInstalled.addListener(() => {
+  // Prepared indexes that shipped in the build go in without being asked for.
+  const seed = () => {
     void syncContentScripts();
-  });
-  browser.runtime.onStartup.addListener(() => {
-    void syncContentScripts();
-  });
+    void loadBundledIndexes().then((report) => {
+      if (report.titles || report.availability || report.similar) {
+        console.log('[keeper] loaded bundled indexes:', report);
+      }
+    });
+  };
+
+  browser.runtime.onInstalled.addListener(seed);
+  browser.runtime.onStartup.addListener(seed);
   browser.permissions.onAdded.addListener(() => {
     void syncContentScripts();
   });

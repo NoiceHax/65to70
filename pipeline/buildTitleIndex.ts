@@ -149,12 +149,12 @@ async function main(): Promise<void> {
     }
   }
 
-  const outPath = resolve(process.cwd(), 'pipeline/out/titles.json');
+  const outPath = resolve(process.cwd(), 'public/data/titles.json');
   mkdirSync(dirname(outPath), { recursive: true });
   writeFileSync(outPath, JSON.stringify({ generatedAt: new Date().toISOString(), entries }));
 
   console.log(`\nWrote ${entries.length} titles to ${outPath}`);
-  console.log('Load it through the extension options page.');
+  console.log('Rebuild the extension (npm run build) — it loads this itself.');
 }
 
 await main();

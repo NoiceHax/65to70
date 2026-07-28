@@ -45,9 +45,9 @@ interface IndexEntry {
  * re-download the full export.
  */
 function seedTitles(): IndexEntry[] {
-  const path = resolve(process.cwd(), 'pipeline/out/titles.json');
+  const path = resolve(process.cwd(), 'public/data/titles.json');
   if (!existsSync(path)) {
-    console.error('Build pipeline/out/titles.json first — this seeds from it.');
+    console.error('Build the title index first — this seeds from it.');
     process.exit(1);
   }
 
@@ -115,7 +115,7 @@ async function main(): Promise<void> {
     if (done % 500 < CONCURRENCY) process.stdout.write(`\r  ${done}/${seeds.length}`);
   }
 
-  const outPath = resolve(process.cwd(), 'pipeline/out/similar.json');
+  const outPath = resolve(process.cwd(), 'public/data/similar.json');
   mkdirSync(dirname(outPath), { recursive: true });
   writeFileSync(
     outPath,
@@ -126,7 +126,7 @@ async function main(): Promise<void> {
     `\nWrote ${Object.keys(similar).length} relationship lists ` +
       `covering ${Object.keys(titles).length} titles to ${outPath}`,
   );
-  console.log('Load it through the extension options page.');
+  console.log('Rebuild the extension (npm run build) — it loads this itself.');
 }
 
 await main();

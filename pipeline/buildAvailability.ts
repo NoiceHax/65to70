@@ -134,7 +134,7 @@ async function main(): Promise<void> {
     titles,
   };
 
-  const outPath = resolve(process.cwd(), `pipeline/out/availability-${region}.json`);
+  const outPath = resolve(process.cwd(), `public/data/availability-${region}.json`);
   mkdirSync(dirname(outPath), { recursive: true });
   writeFileSync(outPath, JSON.stringify(index));
 

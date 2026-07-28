@@ -10,9 +10,10 @@ lerna-debug.log*
 node_modules
 .output
 
-# Generated indexes. Large, rebuildable, and regenerated weekly — they belong
-# in the options page, not in history.
-pipeline/out
+# Generated indexes. Large, rebuildable, and refreshed periodically. They ship
+# inside the build so the extension loads them itself, but they don't belong in
+# history — rebuild them instead.
+public/data
 
 # Local secrets.
 .env
