@@ -132,7 +132,9 @@ const MAX_YEAR = new Date().getFullYear() + 2;
  * titles are a first-class case, not an edge case.
  */
 function normalizeWord(word: string): string {
-  return word.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
+  // \p{M} is kept for the same reason as in lib/match.ts: Indic vowel signs are
+  // combining marks, and dropping them mangles the word rather than tidying it.
+  return word.toLowerCase().replace(/[^\p{L}\p{N}\p{M}]/gu, '');
 }
 
 function isStrongNoise(word: string): boolean {

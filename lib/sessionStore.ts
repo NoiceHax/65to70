@@ -239,12 +239,23 @@ async function createPending(
     status: 'awaiting',
   };
 
-  await db.pending.add(pending);
+  const pendingId = (await db.pending.add(pending)) as number;
   console.log(
     '[keeper] queued for confirmation:',
     pending.cleanedTitle || `(by id ${urlIds.map((i) => `${i.source}:${i.id}`).join(', ')})`,
     pending.year ?? '',
   );
+
+  // Resolve straight away so the confirm queue has candidates ready when the
+  // user opens it. Resolution never marks anything watched — that still needs
+  // an explicit confirmation.
+  try {
+    const { resolvePending } = await import('./resolver');
+    const outcome = await resolvePending(pendingId);
+    console.log('[keeper] resolution:', outcome.status, outcome.message ?? '');
+  } catch (error) {
+    console.warn('[keeper] resolution failed', error);
+  }
 }
 
 /** Close out any session still open for a tab that's gone. */
