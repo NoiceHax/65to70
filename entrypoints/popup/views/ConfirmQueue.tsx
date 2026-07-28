@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
+import { browser } from 'wxt/browser';
 import { coverageRatio, db } from '@/lib/db';
+import { getSettings } from '@/lib/settings';
+import { titleIndexStatus } from '@/lib/titleIndex';
 import {
   confirmCandidate,
   dismissPending,
@@ -26,8 +29,13 @@ interface Row {
 export default function ConfirmQueue({ onChange }: { onChange: () => void }) {
   const [rows, setRows] = useState<Row[]>([]);
   const [busy, setBusy] = useState<number | null>(null);
+  /** Whether anything exists to resolve titles against at all. */
+  const [ready, setReady] = useState<boolean | null>(null);
 
   const refresh = useCallback(async () => {
+    const [settings, index] = await Promise.all([getSettings(), titleIndexStatus()]);
+    setReady(index.loaded || Boolean(settings.tmdbApiKey));
+
     const pending = await db.pending
       .where('status')
       .equals('awaiting')
@@ -73,6 +81,7 @@ export default function ConfirmQueue({ onChange }: { onChange: () => void }) {
           busy={busy === row.pending.id}
           setBusy={setBusy}
           onDone={after}
+          ready={ready}
         />
       ))}
     </ul>
@@ -84,11 +93,14 @@ function QueueItem({
   busy,
   setBusy,
   onDone,
+  ready,
 }: {
   row: Row;
   busy: boolean;
   setBusy: (id: number | null) => void;
   onDone: () => Promise<void>;
+  /** Null while still being checked; false when no resolver is configured. */
+  ready: boolean | null;
 }) {
   const { pending } = row;
   const id = pending.id!;
@@ -165,11 +177,28 @@ function QueueItem({
       )}
 
       {candidates.length === 0 ? (
+        // "No match found" is true but points at the wrong problem when the
+        // real cause is that nothing has been configured to match against.
         <p className="meta">
-          No match found.{' '}
-          <button className="link" onClick={() => void retry()} disabled={busy}>
-            Try again
-          </button>
+          {ready === false ? (
+            <>
+              Nothing to match against yet — load a title index or add a TMDB
+              key.{' '}
+              <button
+                className="link"
+                onClick={() => void browser.runtime.openOptionsPage()}
+              >
+                Open settings
+              </button>
+            </>
+          ) : (
+            <>
+              No match found.{' '}
+              <button className="link" onClick={() => void retry()} disabled={busy}>
+                Try again
+              </button>
+            </>
+          )}
         </p>
       ) : (
         <ul className="candidates">
