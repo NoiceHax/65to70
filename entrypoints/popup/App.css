@@ -117,6 +117,17 @@ ul {
 
 /* Confirm queue --------------------------------------------------------- */
 
+.queue-head-bar {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding-top: 10px;
+}
+
+.queue-head-bar .link {
+  margin-top: 0;
+}
+
 .queue-item {
   padding: 12px 0;
   border-bottom: 1px solid var(--line);

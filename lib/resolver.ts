@@ -353,11 +353,33 @@ export async function confirmCandidate(
   return (await db.movies.get(movie.key)) ?? movie;
 }
 
-/** Drop a detection without recording anything — "this wasn't me". */
+/**
+ * Drop a detection without recording anything — "this wasn't me".
+ *
+ * Remembers the title for that host so it isn't offered again. Site chrome is
+ * stable, so without this the same entry returns on every visit and dismissing
+ * it achieves nothing.
+ */
 export async function dismissPending(pendingId: number): Promise<void> {
   const pending = await db.pending.get(pendingId);
   if (!pending) return;
 
+  if (pending.cleanedTitle) {
+    const { rememberDismissed } = await import('./dismissed');
+    await rememberDismissed(pending.hostname, pending.cleanedTitle);
+  }
+
   await db.sessions.delete(pending.sessionId);
   await db.pending.delete(pendingId);
+}
+
+/** Clear the whole queue at once, remembering each title as not-a-film. */
+export async function dismissAllPending(): Promise<number> {
+  const all = await db.pending.where('status').equals('awaiting').toArray();
+
+  for (const pending of all) {
+    if (pending.id !== undefined) await dismissPending(pending.id);
+  }
+
+  return all.length;
 }

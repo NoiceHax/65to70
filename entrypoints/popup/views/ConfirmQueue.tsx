@@ -5,6 +5,7 @@ import { getSettings } from '@/lib/settings';
 import { titleIndexStatus } from '@/lib/titleIndex';
 import {
   confirmCandidate,
+  dismissAllPending,
   dismissPending,
   resolvePending,
   searchManually,
@@ -73,18 +74,35 @@ export default function ConfirmQueue({ onChange }: { onChange: () => void }) {
   }
 
   return (
-    <ul className="queue">
-      {rows.map((row) => (
-        <QueueItem
-          key={row.pending.id}
-          row={row}
-          busy={busy === row.pending.id}
-          setBusy={setBusy}
-          onDone={after}
-          ready={ready}
-        />
-      ))}
-    </ul>
+    <>
+      <div className="queue-head-bar">
+        <span className="meta">{rows.length} waiting</span>
+        {/* Bulk escape hatch. Each one is also remembered as not-a-film for
+            its site, so clearing the queue actually stays cleared. */}
+        <button
+          className="link"
+          onClick={async () => {
+            await dismissAllPending();
+            await after();
+          }}
+        >
+          Dismiss all
+        </button>
+      </div>
+
+      <ul className="queue">
+        {rows.map((row) => (
+          <QueueItem
+            key={row.pending.id}
+            row={row}
+            busy={busy === row.pending.id}
+            setBusy={setBusy}
+            onDone={after}
+            ready={ready}
+          />
+        ))}
+      </ul>
+    </>
   );
 }
 

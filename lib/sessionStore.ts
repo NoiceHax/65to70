@@ -4,6 +4,7 @@ import { cleanTitle, isUsableTitle, type CleanedTitle } from './titleClean';
 import { rankCandidates, type PageMetaResult } from './pageMeta';
 import { refreshBadge } from './badge';
 import { liveFramesForTab } from './frames';
+import { wasDismissed } from './dismissed';
 import { SAMPLE_INTERVAL_MS, bucketIndex, bucketsCovered } from './progress';
 import type { UrlIdCandidate } from './urlIds';
 import type {
@@ -392,6 +393,19 @@ async function createPending(
   const existing = await db.pending.where('sessionId').equals(sessionId).count();
   if (existing > 0) return;
 
+  {
+    // Already told this isn't a film here. A catalogue id overrides that,
+    // since it's a far stronger signal than a page title.
+    const known = bestTitle(state);
+    if (
+      known &&
+      (state.urlIds ?? []).length === 0 &&
+      (await wasDismissed(hostname, known.title))
+    ) {
+      return;
+    }
+  }
+
   const title = bestTitle(state);
   const urlIds = state.urlIds ?? [];
 
@@ -440,6 +454,35 @@ async function createPending(
     if (outcome.movie?.runtime) {
       await db.sessions.update(sessionId, { runtimeSec: outcome.movie.runtime * 60 });
       console.log('[keeper] runtime from catalogue:', outcome.movie.runtime, 'min');
+    }
+
+    /*
+     * Drop what turned out not to be a film.
+     *
+     * Identifying from page data alone means site chrome gets picked up too —
+     * a homepage titled "Home - NetMirror", a hidden utility frame called
+     * "RotateCookiesPage". Asking the user to sort those out is offloading a
+     * machine's job onto them.
+     *
+     * The resolver already answers this: a real title matches something, and
+     * these match nothing. So "no candidates" is treated as "not a film" and
+     * the entry is withdrawn.
+     *
+     * The exception is `offline`, which means nothing was configured to match
+     * against. That's a setup problem, not a verdict, and discarding on it
+     * would silently throw away real viewing.
+     */
+    const matched =
+      outcome.status === 'resolved' ||
+      outcome.candidates.length > 0 ||
+      urlIds.length > 0 ||
+      outcome.status === 'offline';
+
+    if (!matched) {
+      console.log('[keeper] discarded, matched nothing:', pending.cleanedTitle);
+      await db.pending.delete(pendingId);
+      await refreshBadge();
+      return;
     }
 
     // Ask in the page, while the credits are still rolling — but only when the
