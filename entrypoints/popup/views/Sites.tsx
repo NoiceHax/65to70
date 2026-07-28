@@ -9,7 +9,9 @@ import {
   originPatternFor,
   requestSite,
   revokeSite,
+  syncContentScripts,
 } from '@/lib/permissions';
+import { getSettings, saveSettings, type Settings } from '@/lib/settings';
 import { tabDiagnostics, type TabDiagnostics } from '@/lib/sessionStore';
 
 /**
@@ -27,10 +29,12 @@ export default function Sites({ onChange }: { onChange: () => void }) {
   const [allSites, setAllSites] = useState(false);
   const [report, setReport] = useState<string | null>(null);
   const [inspecting, setInspecting] = useState(false);
+  const [settings, setSettings] = useState<Settings | null>(null);
 
   const refresh = useCallback(async () => {
     setOrigins(await grantedOrigins());
     setAllSites(await hasAllSites());
+    setSettings(await getSettings());
 
     const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
     if (tab?.id !== undefined) setDiagnostics(await tabDiagnostics(tab.id));
@@ -194,6 +198,73 @@ export default function Sites({ onChange }: { onChange: () => void }) {
           </li>
         ))}
       </ul>
+
+      {/* Not everything someone watches should end up named in a popup, listed
+          in a queue, or sitting in an export. Excluded origins are passed to
+          the script registration as exclusions, so nothing of ours runs there
+          at all and there is no title to leak. */}
+      <h2 className="spaced">Private</h2>
+      <p className="note">
+        Keeper never runs on these, whatever else is turned on. Nothing is read,
+        so nothing is recorded.
+      </p>
+
+      <label className="check">
+        <input
+          type="checkbox"
+          checked={settings?.trackingPaused ?? false}
+          onChange={async () => {
+            await saveSettings({ trackingPaused: !settings?.trackingPaused });
+            await syncContentScripts();
+            await refresh();
+          }}
+        />
+        <span>
+          <strong>Pause tracking</strong>
+          <em>Stops everything without giving up any of your settings.</em>
+        </span>
+      </label>
+
+      {tabHost && (
+        <button
+          onClick={async () => {
+            const origin = tabOrigin;
+            if (!origin || !settings) return;
+            if (settings.excludedOrigins.includes(origin)) return;
+
+            await saveSettings({
+              excludedOrigins: [...settings.excludedOrigins, origin],
+            });
+            await syncContentScripts();
+            await refresh();
+          }}
+        >
+          Never track {tabHost}
+        </button>
+      )}
+
+      {(settings?.excludedOrigins.length ?? 0) > 0 && (
+        <ul className="sites">
+          {settings!.excludedOrigins.map((origin) => (
+            <li key={origin}>
+              <label>
+                <input
+                  type="checkbox"
+                  checked
+                  onChange={async () => {
+                    await saveSettings({
+                      excludedOrigins: settings!.excludedOrigins.filter((o) => o !== origin),
+                    });
+                    await syncContentScripts();
+                    await refresh();
+                  }}
+                />
+                {origin.replace('*://', '').replace('/*', '')}
+              </label>
+            </li>
+          ))}
+        </ul>
+      )}
 
       <h2 className="spaced">Search results</h2>
       <p className="note">

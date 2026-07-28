@@ -26,6 +26,28 @@ export interface Settings {
    */
   allowNetworkResolve: boolean;
 
+  /**
+   * Origins never to run on, whatever else is granted.
+   *
+   * Tracking everything means tracking everything, and some of what people
+   * watch they would not want named in a popup, listed in a queue, or sitting
+   * in an export. Filtering after the fact is not good enough, because by then
+   * the title has been read and shown.
+   *
+   * These are passed to the content script registration as exclusions, so
+   * nothing of ours ever runs on them. There is no title to leak because none
+   * is ever read.
+   */
+  excludedOrigins: string[];
+
+  /**
+   * Stop tracking entirely, without revoking anything.
+   *
+   * A quick switch for the times someone wants nothing recorded at all. Faster
+   * and more obvious than un-ticking sites one at a time, and reversible.
+   */
+  trackingPaused: boolean;
+
   /** ISO country code, used for availability lookups. */
   region: string;
 
@@ -48,6 +70,8 @@ export interface Settings {
 
 const DEFAULTS: Settings = {
   allowNetworkResolve: false,
+  excludedOrigins: [],
+  trackingPaused: false,
   region: 'IN',
   language: 'en-US',
 };

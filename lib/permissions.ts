@@ -1,4 +1,5 @@
 import { browser } from 'wxt/browser';
+import { getSettings } from './settings';
 
 /**
  * Per-site permissions.
@@ -124,7 +125,24 @@ export function originPatternFor(url: string): string | null {
  */
 export async function syncContentScripts(): Promise<void> {
   const origins = await grantedOrigins();
+  const { excludedOrigins, trackingPaused } = await getSettings();
+
   console.log('[keeper] granted origins:', origins.length > 0 ? origins.join(', ') : '(none)');
+
+  /*
+   * Paused means nothing runs at all.
+   *
+   * Unregistering rather than filtering later, so there is genuinely no script
+   * in any page reading anything. A pause that still ran and quietly threw the
+   * results away would be a worse promise than not offering one.
+   */
+  if (trackingPaused) {
+    const running = await browser.scripting.getRegisteredContentScripts();
+    const ids = running.map((script) => script.id);
+    if (ids.length > 0) await browser.scripting.unregisterContentScripts({ ids });
+    console.log('[keeper] tracking paused, no scripts registered');
+    return;
+  }
 
   const existing = await browser.scripting.getRegisteredContentScripts();
   const existingIds = new Set(existing.map((s) => s.id));
@@ -148,6 +166,10 @@ export async function syncContentScripts(): Promise<void> {
       id: script.id,
       js: [...script.js],
       matches,
+      // Excluded at registration, not filtered afterwards. Nothing of ours
+      // runs on these origins, so there is no title to leak because none is
+      // ever read.
+      ...(excludedOrigins.length > 0 ? { excludeMatches: excludedOrigins } : {}),
       // Embedded players are commonly cross-origin iframes; the title usually
       // lives in the parent frame, so both need the tracker.
       allFrames: script.allFrames,
