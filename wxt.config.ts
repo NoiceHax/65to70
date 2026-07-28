@@ -3,6 +3,11 @@ import { defineConfig } from 'wxt';
 // See https://wxt.dev/api/config.html
 export default defineConfig({
   modules: ['@wxt-dev/module-react'],
+  // Opens a DevTools Protocol port so `npm run logs` can stream the service
+  // worker and content-script consoles into a terminal.
+  webExt: {
+    chromiumArgs: ['--remote-debugging-port=9222'],
+  },
   manifest: {
     name: 'Keeper',
     // The action title comes from the popup entrypoint's <title>, not here.

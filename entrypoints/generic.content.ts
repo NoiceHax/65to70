@@ -162,10 +162,59 @@ function pickVideo(): HTMLVideoElement | null {
   return pool.reduce((best, v) => (v.duration > best.duration ? v : best));
 }
 
+/** Where in the pipeline this frame currently is, printed once per change. */
+let lastReported = '';
+
+function reportState(): void {
+  const all = document.querySelectorAll('video').length;
+  const usable = Array.from(document.querySelectorAll('video')).filter(usableDuration).length;
+  const frames = embeddedOrigins();
+
+  const state = `${all}:${usable}:${frames.join(',')}:${media ? 'attached' : 'none'}`;
+  if (state === lastReported) return;
+  lastReported = state;
+
+  if (media) {
+    console.log(
+      `[keeper] tracking on ${location.hostname}`,
+      `— ${Math.round(trackedDuration / 60)} min`,
+      isTopFrame ? '(top frame)' : '(iframe)',
+    );
+    return;
+  }
+
+  if (all > 0 && usable === 0) {
+    // Almost always an ad or a preview loop rather than the feature.
+    console.log(
+      `[keeper] ${location.hostname}: ${all} video element(s), none over ${MIN_DURATION_SEC}s`,
+    );
+    return;
+  }
+
+  if (all === 0 && frames.length > 0) {
+    // The single most common reason nothing gets recorded: the player lives in
+    // a frame this extension has no permission to touch.
+    console.warn(
+      `[keeper] ${location.hostname}: no video here, but the page embeds`,
+      frames.join(', '),
+      '— grant that origin in the popup or the player stays invisible',
+    );
+    return;
+  }
+
+  if (all === 0) {
+    console.log(
+      `[keeper] ${location.hostname}: no video yet`,
+      isTopFrame ? '(top frame)' : '(iframe)',
+    );
+  }
+}
+
 function scanForMedia(): void {
   const found = pickVideo();
   if (found) attach(found);
   else if (media && !document.contains(media)) detach();
+  reportState();
 }
 
 /**
@@ -288,6 +337,11 @@ export default defineContentScript({
       const msg = message as ConfirmPromptMessage;
       if (msg?.type === 'confirm-prompt') handleConfirmPrompt(msg);
     });
+
+    console.log(
+      `[keeper] content script live on ${location.hostname}`,
+      isTopFrame ? '(top frame)' : '(iframe)',
+    );
 
     reportPageMeta();
     scanForMedia();

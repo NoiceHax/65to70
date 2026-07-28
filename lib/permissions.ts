@@ -105,6 +105,7 @@ export function originPatternFor(url: string): string | null {
  */
 export async function syncContentScripts(): Promise<void> {
   const origins = await grantedOrigins();
+  console.log('[keeper] granted origins:', origins.length > 0 ? origins.join(', ') : '(none)');
 
   const existing = await browser.scripting.getRegisteredContentScripts();
   const existingIds = new Set(existing.map((s) => s.id));
@@ -134,10 +135,17 @@ export async function syncContentScripts(): Promise<void> {
       runAt: 'document_idle' as const,
     };
 
-    if (existingIds.has(script.id)) {
-      await browser.scripting.updateContentScripts([registration]);
-    } else {
-      await browser.scripting.registerContentScripts([registration]);
+    // Registration is one of the few places a silent failure looks exactly
+    // like "the extension does nothing", so it says so either way.
+    try {
+      if (existingIds.has(script.id)) {
+        await browser.scripting.updateContentScripts([registration]);
+      } else {
+        await browser.scripting.registerContentScripts([registration]);
+      }
+      console.log(`[keeper] registered ${script.id} for:`, matches.join(', '));
+    } catch (error) {
+      console.error(`[keeper] FAILED to register ${script.id}:`, error);
     }
   }
 }
