@@ -4,6 +4,7 @@ import { readAdapterMeta } from '@/lib/adapters';
 import { PLAYER_URL } from '@/lib/frames';
 import { extractUrlIds } from '@/lib/urlIds';
 import { effectiveDuration } from '@/lib/progress';
+import { readPlayerClock, type PlayerClock } from '@/lib/playerClock';
 import { showToast } from '@/lib/toast';
 import type {
   ConfirmPromptMessage,
@@ -61,19 +62,51 @@ function send(message: PageMetaMessage | MediaProgressMessage): void {
 }
 
 /**
+ * The player's on-screen clock, including inside shadow roots.
+ *
+ * Worth reading because the media element and the visible UI disagree
+ * constantly on these sites: `duration` comes back NaN while the player renders
+ * "1:23:45 / 2:14:30" a few pixels away. The runtime was never unavailable —
+ * it just wasn't exposed through the API being asked.
+ */
+function clockFromPage(): PlayerClock | null {
+  const direct = readPlayerClock(document);
+  if (direct) return direct;
+
+  for (const element of Array.from(document.querySelectorAll('*'))) {
+    const shadow = (element as HTMLElement).shadowRoot;
+    if (!shadow) continue;
+
+    const found = readPlayerClock(shadow);
+    if (found) return found;
+  }
+
+  return null;
+}
+
+/**
+ * Runtime in seconds, from whichever source will say.
+ *
+ * The media element first, then the scrubber. Preferring the element is only
+ * because it's cheaper to read, not because it's more trustworthy — on these
+ * players it frequently knows less than the interface it drives.
+ */
+function mediaDuration(el: HTMLVideoElement): number {
+  const known = effectiveDuration(el);
+  if (known > 0) return known;
+  return clockFromPage()?.durationSec ?? 0;
+}
+
+/**
  * Whether this element is the feature rather than an advert or a preview.
  *
- * Runtime is the obvious test and often unavailable: streaming players report
- * `duration` as NaN with an empty `seekable` range, and a real film was being
- * discarded as too short on that basis alone.
- *
- * So when the runtime is unknown, sustained playback stands in for it. Adverts
- * and preview loops are short; a minute of actual elapsed playback is a strong
- * signal this is the thing being watched. The background discards it later if
- * the title never resolves.
+ * Runtime is the obvious test, and when no source can supply one, sustained
+ * playback stands in for it. Adverts and preview loops are short; a minute of
+ * actual elapsed playback is a strong signal this is the thing being watched.
+ * The background discards it later if the title never resolves.
  */
 function looksLikeContent(el: HTMLVideoElement): boolean {
-  const known = effectiveDuration(el);
+  const known = mediaDuration(el);
   if (known >= MIN_DURATION_SEC) return true;
   if (known === 0 && el.currentTime >= MIN_PLAYBACK_SEC) return true;
   return false;
@@ -123,9 +156,9 @@ function onTimeUpdate(): void {
   // all coverage each time. A genuine ad-to-feature switch changes the duration
   // by an order of magnitude, so it still trips this easily.
   const changeThreshold = Math.max(DURATION_EPSILON_SEC, trackedDuration * 0.2);
-  if (Math.abs(effectiveDuration(media) - trackedDuration) > changeThreshold) {
+  if (Math.abs(mediaDuration(media) - trackedDuration) > changeThreshold) {
     flush(true);
-    trackedDuration = effectiveDuration(media);
+    trackedDuration = mediaDuration(media);
     lastSampleAt = 0;
   }
 
@@ -158,7 +191,7 @@ function attach(el: HTMLVideoElement): void {
   detach();
 
   media = el;
-  trackedDuration = effectiveDuration(el);
+  trackedDuration = mediaDuration(el);
   lastSampleAt = 0;
 
   el.addEventListener('timeupdate', onTimeUpdate);
