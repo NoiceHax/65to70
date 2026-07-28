@@ -28,6 +28,15 @@ export interface ToastOptions {
   onDismiss: () => void;
   /** Called when the toast is closed without an answer. */
   onIgnore: () => void;
+  /**
+   * Where to attach.
+   *
+   * Defaults to the document root, which is wrong while anything is
+   * fullscreen: the browser renders only the fullscreen element and its
+   * descendants, so a toast attached anywhere else exists but is never drawn.
+   * Callers pass the fullscreen element when there is one.
+   */
+  container?: Element;
 }
 
 const HOST_ID = 'keeper-toast-host';
@@ -174,9 +183,11 @@ export function showToast(options: ToastOptions): void {
   card.append(brand, title, prompt);
   if (options.showStars !== false) card.append(stars);
   card.append(row);
+
   wrap.append(card, closeButton);
   shadow.append(style, wrap);
-  document.documentElement.appendChild(host);
+  // Inside the fullscreen element when there is one, or nothing is drawn.
+  (options.container ?? document.documentElement).appendChild(host);
 
   // Timing out leaves the detection in the confirm queue rather than dropping
   // it - being ignored must never mean being discarded.

@@ -404,7 +404,29 @@ function reportPageMeta(): void {
  * toast inside its own iframe, where it may be clipped, tiny, or invisible.
  */
 function handleConfirmPrompt(msg: ConfirmPromptMessage): void {
-  if (!isTopFrame) return;
+  /*
+   * Work out which frame should draw it, and where.
+   *
+   * While anything is fullscreen the browser renders only the fullscreen
+   * element and its descendants. A toast attached to the document root then
+   * exists and is never drawn - which looks exactly like a prompt that never
+   * fired, and is almost certainly what happens while watching a film.
+   *
+   * The message goes to every frame, so each one decides for itself:
+   *
+   *  - Fullscreen on an iframe means the player frame is the one on screen.
+   *    The parent stands down and lets the child draw it.
+   *  - Any other fullscreen element is the thing being rendered, so the toast
+   *    goes inside it.
+   *  - With nothing fullscreen, only the top frame draws, or an embedded
+   *    player would produce a second toast inside itself.
+   */
+  const fullscreen = document.fullscreenElement;
+
+  if (fullscreen?.tagName === 'IFRAME') return;
+  if (!fullscreen && !isTopFrame) return;
+
+  const container = fullscreen ?? document.documentElement;
 
   const reply = (action: ToastActionMessage['action'], rating: number | null) => {
     const message: ToastActionMessage = {
@@ -423,6 +445,7 @@ function handleConfirmPrompt(msg: ConfirmPromptMessage): void {
   const matched = msg.tmdbId !== undefined;
 
   showToast({
+    container,
     title: msg.title,
     year: msg.year,
     prompt: matched
