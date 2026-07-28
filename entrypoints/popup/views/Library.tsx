@@ -18,6 +18,15 @@ export default function Library() {
   const [resuming, setResuming] = useState<Row[]>([]);
   const [watched, setWatched] = useState<Row[]>([]);
   const [editing, setEditing] = useState<string | null>(null);
+  /**
+   * The slider's value while it's being dragged.
+   *
+   * Writing on every pointer move re-sorted the list underneath the cursor —
+   * crossing the completion threshold moves a row from "Continue watching" to
+   * "Watched" — so the thing being dragged jumped away mid-drag. The value is
+   * held here until the drag ends, and only then committed.
+   */
+  const [draft, setDraft] = useState<number | null>(null);
 
   const refresh = useCallback(async () => {
     const inProgress = await continueWatching(8);
@@ -49,7 +58,14 @@ export default function Library() {
 
   const adjust = async (key: string, ratio: number) => {
     await setManualProgress(key, ratio);
+    setDraft(null);
     await refresh();
+  };
+
+  /** Commit whatever the slider was left on, if anything. */
+  const commitDraft = async (key: string) => {
+    if (draft === null) return;
+    await adjust(key, draft / 100);
   };
 
   const renderRow = ({ movie, progress, lastSeenAt }: Row) => (
@@ -73,7 +89,11 @@ export default function Library() {
           <button
             className="pct"
             title="Adjust progress"
-            onClick={() => setEditing(editing === movie.key ? null : movie.key)}
+            onClick={() => {
+              // A draft belongs to one row's slider; switching rows discards it.
+              setDraft(null);
+              setEditing(editing === movie.key ? null : movie.key);
+            }}
           >
             {Math.round(progress * 100)}%
             {movie.manualProgress !== undefined && <span className="manual"> set</span>}
@@ -99,8 +119,13 @@ export default function Library() {
               min={0}
               max={100}
               step={5}
-              value={Math.round(progress * 100)}
-              onChange={(e) => void adjust(movie.key, Number(e.target.value) / 100)}
+              value={draft ?? Math.round(progress * 100)}
+              // Dragging only moves the handle. Nothing is written, and so
+              // nothing re-sorts, until the drag ends.
+              onChange={(e) => setDraft(Number(e.target.value))}
+              onPointerUp={() => void commitDraft(movie.key)}
+              onKeyUp={() => void commitDraft(movie.key)}
+              onBlur={() => void commitDraft(movie.key)}
             />
             <div className="adjust-actions">
               <button onClick={() => void adjust(movie.key, 1)}>Finished</button>
