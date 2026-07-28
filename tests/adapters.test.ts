@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from 'vitest';
-import { adapterFor, readAdapterMeta } from '@/lib/adapters';
+import { adapterFor, parseJwSecondary, readAdapterMeta } from '@/lib/adapters';
 import { cleanTitle } from '@/lib/titleClean';
 
 function docFrom(html: string): Document {
@@ -76,6 +76,64 @@ describe('Prime Video', () => {
     const doc = docFrom('<body><div class="atvwebplayersdk-title-text">Arrival</div></body>');
     const meta = readAdapterMeta(doc, 'https://www.primevideo.com/detail/0XYZ', 'www.primevideo.com');
     expect(meta?.rawTitle).toBe('Arrival');
+  });
+});
+
+describe('JW Player', () => {
+  // Matched by its own DOM rather than by hostname, so one adapter covers every
+  // site embedding it — including ones never looked at.
+  const url = 'https://net52.cc/play.php?id=81446739';
+
+  it('reads the title from the player, whatever the host', () => {
+    const doc = docFrom(`
+      <body><div id="jw" class="jwplayer">
+        <div class="jw-title-primary jw-reset-text">Lift</div>
+        <div class="jw-title-secondary jw-reset-text">2024 U/A 13+ 1h 46m</div>
+      </div></body>`);
+
+    const meta = readAdapterMeta(doc, url, 'net52.cc');
+    expect(meta).toMatchObject({ rawTitle: 'Lift', strategy: 'manual', yearHint: 2024 });
+  });
+
+  it('folds an episode marker into the title', () => {
+    const doc = docFrom(`
+      <body>
+        <div class="jw-title-primary">How I Met Your Mother</div>
+        <div class="jw-title-secondary">2008 S3:E12 22m</div>
+      </body>`);
+
+    const meta = readAdapterMeta(doc, url, 'net52.cc');
+    expect(cleanTitle(meta!.rawTitle)).toMatchObject({
+      title: 'How I Met Your Mother',
+      season: 3,
+      episode: 12,
+      mediaType: 'tv',
+    });
+  });
+
+  it('returns null when no JW Player is present', () => {
+    expect(readAdapterMeta(docFrom('<body><h1>Home</h1></body>'), url, 'net52.cc')).toBeNull();
+  });
+});
+
+describe('parseJwSecondary', () => {
+  it('reads year and runtime', () => {
+    expect(parseJwSecondary('2024 U/A 13+ 1h 46m')).toMatchObject({
+      year: 2024,
+      runtimeMinutes: 106,
+    });
+  });
+
+  it('reads a runtime given only in minutes', () => {
+    expect(parseJwSecondary('2008 22m')).toMatchObject({ runtimeMinutes: 22 });
+  });
+
+  it('reads a season and episode', () => {
+    expect(parseJwSecondary('2008 S3:E12 22m')).toMatchObject({ season: 3, episode: 12 });
+  });
+
+  it('returns nothing useful for an empty line', () => {
+    expect(parseJwSecondary('')).toEqual({});
   });
 });
 

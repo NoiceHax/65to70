@@ -178,10 +178,99 @@ const hotstar: SiteAdapter = {
   },
 };
 
+// ---------------------------------------------------------------------------
+// JW Player
+// ---------------------------------------------------------------------------
+
+/**
+ * Parse the player's secondary line — "2024 U/A 13+ 1h 46m".
+ *
+ * Carries the year and runtime, and for a series the episode, all in one
+ * string. Worth reading properly: the runtime is authoritative where the media
+ * element's is not, and the year separates a remake from its original.
+ */
+export function parseJwSecondary(text: string): {
+  year?: number;
+  runtimeMinutes?: number;
+  season?: number;
+  episode?: number;
+} {
+  const out: { year?: number; runtimeMinutes?: number; season?: number; episode?: number } = {};
+
+  const year = text.match(/\b(19\d{2}|20\d{2})\b/);
+  if (year) out.year = Number(year[1]);
+
+  const hoursAndMinutes = text.match(/(\d+)\s*h\s*(\d+)\s*m/i);
+  const minutesOnly = text.match(/\b(\d+)\s*m(?:in)?\b/i);
+
+  if (hoursAndMinutes) {
+    out.runtimeMinutes = Number(hoursAndMinutes[1]) * 60 + Number(hoursAndMinutes[2]);
+  } else if (minutesOnly) {
+    out.runtimeMinutes = Number(minutesOnly[1]);
+  }
+
+  const episode = text.match(/\bS(\d{1,2})\s*[·:•|-]?\s*E(\d{1,3})\b/i);
+  if (episode) {
+    out.season = Number(episode[1]);
+    out.episode = Number(episode[2]);
+  }
+
+  return out;
+}
+
+/**
+ * JW Player, matched by its own DOM rather than by hostname.
+ *
+ * This is the most useful adapter in the set precisely because it isn't
+ * site-specific. JW Player is a commercial player embedded across a great many
+ * streaming sites, and its class names are stable and documented — so one
+ * adapter covers every site that uses it, including ones nobody has looked at.
+ *
+ * It also solves the case that host adapters cannot: a single-page app that
+ * never changes its URL, where the top frame only ever shows the home page and
+ * the only truthful description of what's playing is inside the player.
+ */
+const jwPlayer: SiteAdapter = {
+  id: 'jwplayer',
+  // Presence is decided by the DOM in `read`, not the hostname.
+  matches: () => true,
+
+  read(doc) {
+    const title = text(doc, '.jw-title-primary');
+    if (!title) return null;
+
+    const secondary = text(doc, '.jw-title-secondary');
+    const parsed = secondary ? parseJwSecondary(secondary) : {};
+
+    return {
+      rawTitle: withEpisode(title, parsed.season, parsed.episode),
+      strategy: 'manual',
+      yearHint: parsed.year,
+    };
+  },
+};
+
+/**
+ * Host adapters first, then player adapters.
+ *
+ * A host adapter knows the specific service and can be precise about it. A
+ * player adapter is the fallback that generalises — it recognises the software
+ * rather than the site, which is what makes it work on sites never seen before.
+ */
 const ADAPTERS: SiteAdapter[] = [netflix, primeVideo, hotstar];
+const PLAYER_ADAPTERS: SiteAdapter[] = [jwPlayer];
 
 export function adapterFor(hostname: string): SiteAdapter | null {
   return ADAPTERS.find((adapter) => adapter.matches(hostname)) ?? null;
+}
+
+function tryRead(adapter: SiteAdapter, doc: Document, url: string): PageMetaResult | null {
+  try {
+    return adapter.read(doc, url);
+  } catch {
+    // A site redesign must never take the extension down with it.
+    return null;
+  }
 }
 
 /** Read a Tier 1 title for this page, or null to fall through to Tier 2. */
@@ -190,13 +279,20 @@ export function readAdapterMeta(
   url: string,
   hostname: string,
 ): PageMetaResult | null {
-  const adapter = adapterFor(hostname);
-  if (!adapter) return null;
-
-  try {
-    return adapter.read(doc, url);
-  } catch {
-    // A site redesign must never take the extension down with it.
-    return null;
+  const host = adapterFor(hostname);
+  if (host) {
+    const found = tryRead(host, doc, url);
+    if (found) return found;
   }
+
+  // Then by player. Recognising the software rather than the site is what makes
+  // this work on sites nobody has written an adapter for — and it is the only
+  // thing that works when the page never changes its URL and the top frame
+  // shows nothing but a home page.
+  for (const adapter of PLAYER_ADAPTERS) {
+    const found = tryRead(adapter, doc, url);
+    if (found) return found;
+  }
+
+  return null;
 }
