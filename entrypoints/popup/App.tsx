@@ -5,6 +5,7 @@ import Library from './views/Library';
 import Watchlist from './views/Watchlist';
 import WatchNext from './views/WatchNext';
 import Sites from './views/Sites';
+import TrackingNow from './views/TrackingNow';
 import './App.css';
 
 type Tab = 'queue' | 'watchlist' | 'library' | 'sites';
@@ -42,6 +43,8 @@ function App() {
         <h1>Keeper</h1>
         <p className="tagline">Nothing leaves this machine.</p>
       </header>
+
+      <TrackingNow />
 
       <nav>
         <button className={tab === 'queue' ? 'on' : ''} onClick={() => setTab('queue')}>

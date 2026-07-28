@@ -142,6 +142,74 @@ export async function recomputeWatchState(key: TitleKey): Promise<void> {
   });
 }
 
+export interface ActiveTracking {
+  sessionId: number;
+  /** Resolved title when known, otherwise whatever was read off the page. */
+  title: string;
+  /** False while the title is still just page text, not a catalogue match. */
+  identified: boolean;
+  site: string;
+  ratio: number;
+  season?: number;
+  episode?: number;
+  lastSeenAt: number;
+}
+
+/**
+ * What is being tracked right now.
+ *
+ * A session counts as live if it reported in recently — the content script
+ * flushes every fifteen seconds, so a minute and a half of silence means
+ * playback stopped, the tab closed, or something broke. Erring long is
+ * deliberate: showing a stale row briefly is better than a status that blinks
+ * out while a film is still playing.
+ */
+export async function activeTracking(withinMs = 90_000): Promise<ActiveTracking[]> {
+  const since = Date.now() - withinMs;
+
+  const sessions = await db.sessions
+    .where('lastSeenAt')
+    .above(since)
+    .filter((session) => session.stoppedAt === undefined)
+    .toArray();
+
+  const out: ActiveTracking[] = [];
+
+  for (const session of sessions) {
+    if (session.id === undefined) continue;
+
+    let title: string | null = null;
+    let identified = false;
+
+    if (session.titleKey) {
+      const movie = await db.movies.get(session.titleKey);
+      if (movie) {
+        title = movie.title;
+        identified = true;
+      }
+    }
+
+    if (!title) {
+      // Not confirmed yet, so fall back to what the queue is showing.
+      const pending = await db.pending.where('sessionId').equals(session.id).first();
+      title = pending?.cleanedTitle || null;
+    }
+
+    out.push({
+      sessionId: session.id,
+      title: title || 'Identifying…',
+      identified,
+      site: session.site,
+      ratio: coverageRatio(session.coverage),
+      season: session.season,
+      episode: session.episode,
+      lastSeenAt: session.lastSeenAt,
+    });
+  }
+
+  return out.sort((a, b) => b.lastSeenAt - a.lastSeenAt);
+}
+
 export interface WatchedEpisode {
   season: number;
   episode: number;
