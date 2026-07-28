@@ -3,7 +3,7 @@ import { getSettings } from './settings';
 import { rememberDismissed } from './dismissed';
 import { findByImdbId, getById, search, verifyId, TmdbError, type TmdbTitle } from './tmdb';
 import { isDecisive, rankMatches, type ScoredCandidate } from './match';
-import { lookupLocal, lookupLocalById } from './titleIndex';
+import { lookupLocal, lookupLocalById, searchLocalTitles } from './titleIndex';
 import { titleKey, type MediaType, type Movie, type PendingDetection, type Source } from './types';
 
 /**
@@ -170,6 +170,7 @@ export async function resolvePending(pendingId: number): Promise<ResolveOutcome>
       title: pending.cleanedTitle,
       year: pending.year,
       runtimeMinutes,
+      mediaType,
     };
 
     // 2. The local index, which needs no network at all. This is what keeps
@@ -302,13 +303,31 @@ export async function searchManually(
   query: string,
   mediaType: MediaType,
 ): Promise<TmdbTitle[]> {
-  const settings = await getSettings();
-  if (!settings.tmdbApiKey || query.trim().length === 0) return [];
+  const trimmed = query.trim();
+  if (trimmed.length === 0) return [];
 
-  return search(query.trim(), mediaType, undefined, {
-    apiKey: settings.tmdbApiKey,
-    language: settings.language,
-  });
+  const settings = await getSettings();
+
+  // The local index first, because it needs nothing configured and holds tens
+  // of thousands of titles. This box used to ask TMDB and nothing else, so
+  // without an API key it returned silence and there was no way at all to
+  // reach a title the automatic match had missed.
+  const local = await searchLocalTitles(trimmed);
+
+  if (!settings.tmdbApiKey) return local;
+
+  try {
+    const remote = await search(trimmed, mediaType, undefined, {
+      apiKey: settings.tmdbApiKey,
+      language: settings.language,
+    });
+
+    // Both, deduplicated, so a key widens the search rather than replacing it.
+    const seen = new Set(local.map((item) => `${item.mediaType}:${item.tmdbId}`));
+    return [...local, ...remote.filter((item) => !seen.has(`${item.mediaType}:${item.tmdbId}`))];
+  } catch {
+    return local;
+  }
 }
 
 export interface ConfirmOptions {

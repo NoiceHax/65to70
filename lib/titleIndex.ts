@@ -152,6 +152,52 @@ export function indexGeneratedAt(): string | null {
   return loadedAt;
 }
 
+/**
+ * Free-text search over the local index.
+ *
+ * The confirm queue's search box only ever asked TMDB, so without an API key
+ * it returned nothing and there was no way at all to reach a title the
+ * automatic match had missed. Since the index is already loaded and holds tens
+ * of thousands of titles, it can answer most of those searches on its own.
+ *
+ * Deliberately looser than `lookupLocal`, which is an exact match built for
+ * speed on every detection. This runs only when someone is typing, so a linear
+ * scan is affordable and being generous is the point.
+ */
+export async function searchLocalTitles(
+  query: string,
+  limit = 20,
+): Promise<TmdbTitle[]> {
+  const trimmed = normalizeTitle(query);
+  if (trimmed.length < 2) return [];
+
+  const entry = await db.meta.get(META_KEY);
+  if (!entry) return [];
+
+  const stored = entry.value as StoredIndex;
+  const scored: { entry: IndexEntry; score: number }[] = [];
+
+  for (const item of stored.entries) {
+    const names = [item.t, ...(item.a ?? [])];
+    let best = 0;
+
+    for (const name of names) {
+      const normalized = normalizeTitle(name);
+      if (normalized === trimmed) best = Math.max(best, 3);
+      else if (normalized.startsWith(trimmed)) best = Math.max(best, 2);
+      else if (normalized.includes(trimmed)) best = Math.max(best, 1);
+    }
+
+    if (best > 0) scored.push({ entry: item, score: best });
+  }
+
+  // Exact first, then prefix, then anything containing it. Newer releases
+  // first within a tier, since a recent title is the likelier search.
+  scored.sort((a, b) => b.score - a.score || (b.entry.y ?? 0) - (a.entry.y ?? 0));
+
+  return scored.slice(0, limit).map(({ entry: item }) => toTmdbTitle(item));
+}
+
 /** Built alongside the title map, so lookups by id cost nothing extra. */
 let byId: Map<number, IndexEntry> | null = null;
 

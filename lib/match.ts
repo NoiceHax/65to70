@@ -60,6 +60,14 @@ export interface MatchInput {
   year?: number;
   /** Runtime in minutes, when the player reported a duration. */
   runtimeMinutes?: number;
+  /**
+   * Film or series, when the detection made that clear.
+   *
+   * An episode marker settles it, and it matters: "Wednesday" is a 2022 series
+   * and also several films, and without this a film outranks the show being
+   * watched purely because it happens to sit higher in the index.
+   */
+  mediaType?: 'movie' | 'tv';
 }
 
 /** 0-1. Above ~0.75 a single candidate is safe to treat as the answer. */
@@ -101,6 +109,12 @@ export function scoreMatch(input: MatchInput, candidate: TmdbTitle): number {
     if (drift === 0) score += 0.15;
     else if (drift === 1) score += 0.05;
     else score -= 0.35;
+  }
+
+  // A known kind is a strong signal, but not absolute: an episode marker can
+  // be misread, so a mismatch is pushed down rather than ruled out.
+  if (input.mediaType !== undefined && input.mediaType !== candidate.mediaType) {
+    score -= 0.3;
   }
 
   if (input.runtimeMinutes !== undefined && candidate.runtime) {
