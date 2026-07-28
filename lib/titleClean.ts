@@ -253,7 +253,19 @@ export function cleanTitle(raw: string): CleanedTitle {
 export function isUsableTitle(cleaned: CleanedTitle): boolean {
   const t = cleaned.title;
   if (t.length < 2) return false;
-  if (/^(home|index|watch|player|video|login|sign in)$/i.test(t)) return false;
+  if (/^(home|index|watch|player|video|login|sign in|browse|search)$/i.test(t)) return false;
+
+  /*
+   * Marketing taglines, not titles.
+   *
+   * A landing page announces itself with a list — "Watch TV Shows, Movies,
+   * Specials, Live Cricket & Football". Three or more commas is the giveaway:
+   * real titles almost never reach that. Two is deliberately allowed, because
+   * films like "Sex, Lies, and Videotape" exist and losing one is worse than
+   * letting the odd tagline through to the resolver, which rejects it anyway.
+   */
+  if ((t.match(/,/g) ?? []).length >= 3) return false;
+  if (t.length > 90) return false;
 
   // Whatever survived cleaning is still just padding — e.g. "Watch Now"
   // reduces to "Now", which is a real film but not a real detection here.

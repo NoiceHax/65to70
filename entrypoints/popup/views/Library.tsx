@@ -71,9 +71,15 @@ export default function Library() {
                 <span className="title">
                   {movie.title}
                   {movie.year ? <span className="year"> {movie.year}</span> : null}
-                  {movie.rewatch > 0 && (
+                  {/* A series accumulates rather than being finished, so it
+                      reports episodes seen instead of a rewatch multiplier. */}
+                  {movie.mediaType === 'tv' && movie.episodesWatched ? (
+                    <span className="badge">
+                      {movie.episodesWatched} ep{movie.episodesWatched === 1 ? '' : 's'}
+                    </span>
+                  ) : movie.rewatch > 0 ? (
                     <span className="badge">×{movie.rewatch + 1}</span>
-                  )}
+                  ) : null}
                 </span>
                 <span className="meta">
                   {movie.rating !== null && <span className="rating">{movie.rating}★</span>}

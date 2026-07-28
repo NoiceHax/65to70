@@ -31,6 +31,9 @@ export interface HistoryItem {
   imdbId?: string;
   mediaType: 'movie' | 'tv';
   watchedAt: string;
+  /** Present for series. Both services record episodes, never whole shows. */
+  season?: number;
+  episode?: number;
 }
 
 export class SyncError extends Error {}
@@ -56,19 +59,32 @@ export async function buildHistory(): Promise<HistoryItem[]> {
       .filter((s: Session) => s.complete === 1)
       .sort((a, b) => a.startedAt - b.startedAt);
 
-    const dates =
-      complete.length > 0
-        ? complete.map((s) => new Date(s.stoppedAt ?? s.lastSeenAt).toISOString())
-        : [new Date(movie.lastConfirmed ?? Date.now()).toISOString()];
+    const base = {
+      title: movie.title,
+      year: movie.year,
+      tmdbId: movie.tmdbId,
+      imdbId: movie.imdbId,
+      mediaType: movie.mediaType,
+    };
 
-    for (const watchedAt of dates) {
+    if (complete.length === 0) {
+      // Confirmed watched but its sessions were pruned. Only meaningful for a
+      // film — an episode with no session has no episode number to send.
+      if (movie.mediaType === 'movie') {
+        items.push({
+          ...base,
+          watchedAt: new Date(movie.lastConfirmed ?? Date.now()).toISOString(),
+        });
+      }
+      continue;
+    }
+
+    for (const session of complete) {
       items.push({
-        title: movie.title,
-        year: movie.year,
-        tmdbId: movie.tmdbId,
-        imdbId: movie.imdbId,
-        mediaType: movie.mediaType,
-        watchedAt,
+        ...base,
+        watchedAt: new Date(session.stoppedAt ?? session.lastSeenAt).toISOString(),
+        season: session.season,
+        episode: session.episode,
       });
     }
   }
@@ -76,17 +92,62 @@ export async function buildHistory(): Promise<HistoryItem[]> {
   return items;
 }
 
+/**
+ * Both services record *episodes*, never whole shows.
+ *
+ * Sending a show with only its ids logs nothing useful — it has to carry the
+ * season and episode structure, with a watch date on each episode. So episodes
+ * are grouped back under their show and season here.
+ */
 function toPayload(items: HistoryItem[]) {
-  const entry = (item: HistoryItem) => ({
-    title: item.title,
-    year: item.year,
-    ids: { tmdb: item.tmdbId, ...(item.imdbId ? { imdb: item.imdbId } : {}) },
-    watched_at: item.watchedAt,
-  });
+  const movies = items
+    .filter((item) => item.mediaType === 'movie')
+    .map((item) => ({
+      title: item.title,
+      year: item.year,
+      ids: { tmdb: item.tmdbId, ...(item.imdbId ? { imdb: item.imdbId } : {}) },
+      watched_at: item.watchedAt,
+    }));
+
+  const episodes = items.filter(
+    (item) => item.mediaType === 'tv' && item.season !== undefined && item.episode !== undefined,
+  );
+
+  const shows = new Map<
+    number,
+    {
+      title: string;
+      year?: number;
+      ids: { tmdb: number; imdb?: string };
+      seasons: Map<number, { number: number; watched_at: string }[]>;
+    }
+  >();
+
+  for (const item of episodes) {
+    let show = shows.get(item.tmdbId);
+    if (!show) {
+      show = {
+        title: item.title,
+        year: item.year,
+        ids: { tmdb: item.tmdbId, ...(item.imdbId ? { imdb: item.imdbId } : {}) },
+        seasons: new Map(),
+      };
+      shows.set(item.tmdbId, show);
+    }
+
+    const season = show.seasons.get(item.season!) ?? [];
+    season.push({ number: item.episode!, watched_at: item.watchedAt });
+    show.seasons.set(item.season!, season);
+  }
 
   return {
-    movies: items.filter((i) => i.mediaType === 'movie').map(entry),
-    shows: items.filter((i) => i.mediaType === 'tv').map(entry),
+    movies,
+    shows: [...shows.values()].map((show) => ({
+      title: show.title,
+      year: show.year,
+      ids: show.ids,
+      seasons: [...show.seasons].map(([number, eps]) => ({ number, episodes: eps })),
+    })),
   };
 }
 

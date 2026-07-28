@@ -2,7 +2,8 @@ import { browser } from 'wxt/browser';
 import { syncContentScripts } from '@/lib/permissions';
 import { db } from '@/lib/db';
 import { handleMediaProgress, handlePageMeta, handleTabClosed } from '@/lib/sessionStore';
-import { librarySnapshot } from '@/lib/librarySnapshot';
+import { invalidateLibrarySnapshot, librarySnapshot } from '@/lib/librarySnapshot';
+import { addFromSearch, offerFromSearch } from '@/lib/searchIntent';
 import { confirmCandidate, dismissPending } from '@/lib/resolver';
 import { refreshBadge } from '@/lib/badge';
 import type { KeeperMessage } from '@/lib/messages';
@@ -32,6 +33,20 @@ export default defineBackground(() => {
     if (msg.type === 'library-request') {
       void librarySnapshot().then((entries) => sendResponse({ entries }));
       return true;
+    }
+
+    if (msg.type === 'search-query') {
+      void offerFromSearch(msg.query).then(sendResponse);
+      return true;
+    }
+
+    // Saving from a search is an explicit choice, so it goes straight to the
+    // watchlist rather than through the confirm queue.
+    if (msg.type === 'watchlist-add') {
+      void addFromSearch(msg.tmdbId, msg.mediaType, msg.title, msg.year).then(() => {
+        invalidateLibrarySnapshot();
+      });
+      return;
     }
 
     // The in-page prompt. Confirming here does exactly what the queue does —

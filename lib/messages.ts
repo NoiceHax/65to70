@@ -132,8 +132,41 @@ export interface ToastActionMessage {
   rating: number | null;
 }
 
+/**
+ * A search-engine query, offered for watchlisting.
+ *
+ * Searching for a film is a statement of interest, and the moment right after
+ * is when saving it costs nothing. The background decides whether the query
+ * names something real and whether it's already known — the overlay only asks.
+ */
+export interface SearchQueryMessage {
+  type: 'search-query';
+  query: string;
+}
+
+export interface SearchQueryResponse {
+  /** Absent when the query named nothing, or something already saved. */
+  match?: {
+    tmdbId: number;
+    mediaType: 'movie' | 'tv';
+    title: string;
+    year?: number;
+  };
+}
+
+export interface WatchlistAddMessage {
+  type: 'watchlist-add';
+  tmdbId: number;
+  mediaType: 'movie' | 'tv';
+  /** Carried so saving works with no key configured and no network call. */
+  title: string;
+  year?: number;
+}
+
 export type KeeperMessage =
   | PageMetaMessage
   | MediaProgressMessage
   | LibraryRequest
-  | ToastActionMessage;
+  | ToastActionMessage
+  | SearchQueryMessage
+  | WatchlistAddMessage;

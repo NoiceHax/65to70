@@ -231,9 +231,18 @@ function scoreCandidate(candidate: PageMetaResult, brands: Set<string>): number 
   // client-rendered site report "Cineby" as the film.
   if (brands.has(normalized)) return -1000;
   for (const brand of brands) {
-    if (brand.length >= 4 && normalized.length <= brand.length + 4 && normalized.includes(brand)) {
+    if (brand.length < 4) continue;
+
+    if (normalized.length <= brand.length + 4 && normalized.includes(brand)) {
       score -= 500;
+      continue;
     }
+
+    // A title that opens with the site's own name is the landing page
+    // announcing itself — "JioHotstar - Watch TV Shows, Movies, ...". Heavily
+    // penalised rather than rejected outright, since a show can legitimately
+    // carry a service's name ("Hotstar Specials: ...").
+    if (normalized.startsWith(brand)) score -= 400;
   }
 
   if (/\b(19\d{2}|20\d{2})\b/.test(candidate.rawTitle)) score += 15;

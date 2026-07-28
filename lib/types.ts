@@ -60,6 +60,15 @@ export interface Movie {
   /** Complete sessions beyond the first. */
   rewatch: number;
 
+  /**
+   * Distinct episodes finished, for series only.
+   *
+   * A show is never "watched" the way a film is — it accumulates. Cached here
+   * because the authoritative data is spread across sessions and a list view
+   * shouldn't scan them per row.
+   */
+  episodesWatched?: number;
+
   sources: Source[];
   /** First source that introduced this title. */
   addedFrom?: string;

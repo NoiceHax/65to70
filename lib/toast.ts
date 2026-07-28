@@ -17,6 +17,12 @@
 export interface ToastOptions {
   title: string;
   year?: number;
+  /** The question. Defaults to the tracking prompt. */
+  prompt?: string;
+  confirmLabel?: string;
+  dismissLabel?: string;
+  /** Stars only make sense for something being watched, not something saved. */
+  showStars?: boolean;
   /** Called with a rating (1–5) or null when the user just says yes. */
   onConfirm: (rating: number | null) => void;
   onDismiss: () => void;
@@ -70,10 +76,12 @@ export function showToast(options: ToastOptions): void {
   host.id = HOST_ID;
   // Max z-index and fixed positioning: players go fullscreen and will otherwise
   // paint straight over this.
+  // Top right: players put their own controls along the bottom edge, and a
+  // bottom-corner toast lands on top of them.
   host.style.cssText = [
     'position:fixed',
     'right:20px',
-    'bottom:20px',
+    'top:20px',
     'z-index:2147483647',
     'width:auto',
     'height:auto',
@@ -107,7 +115,7 @@ export function showToast(options: ToastOptions): void {
   const prompt = document.createElement('div');
   // Asked at detection now, not at the end — so this settles what is playing,
   // not whether it was finished. Coverage still decides that.
-  prompt.textContent = 'Tracking this — is that right?';
+  prompt.textContent = options.prompt ?? 'Tracking this — is that right?';
 
   let rating: number | null = null;
   const stars = document.createElement('div');
@@ -134,7 +142,7 @@ export function showToast(options: ToastOptions): void {
 
   const confirm = document.createElement('button');
   confirm.className = 'act primary';
-  confirm.textContent = 'Yes, track it';
+  confirm.textContent = options.confirmLabel ?? 'Yes, track it';
   confirm.addEventListener('click', () => {
     options.onConfirm(rating);
     close();
@@ -142,7 +150,7 @@ export function showToast(options: ToastOptions): void {
 
   const dismiss = document.createElement('button');
   dismiss.className = 'act';
-  dismiss.textContent = 'Not me';
+  dismiss.textContent = options.dismissLabel ?? 'Not me';
   dismiss.addEventListener('click', () => {
     options.onDismiss();
     close();
@@ -161,7 +169,11 @@ export function showToast(options: ToastOptions): void {
   row.className = 'row';
   row.append(confirm, dismiss);
 
-  card.append(brand, title, prompt, stars, row);
+  // Stars are for something being watched. Saving a title for later says
+  // nothing about whether it was any good.
+  card.append(brand, title, prompt);
+  if (options.showStars !== false) card.append(stars);
+  card.append(row);
   wrap.append(card, closeButton);
   shadow.append(style, wrap);
   document.documentElement.appendChild(host);

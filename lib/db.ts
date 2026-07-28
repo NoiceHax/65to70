@@ -90,17 +90,86 @@ export function isComplete(coverage: Uint8Array): boolean {
  * not when any single session does. `rewatch` counts individually-complete
  * sessions beyond the first, which is what Letterboxd's Rewatch column means.
  */
+/** Group key for one episode. Films collapse to a single group. */
+function episodeKey(session: Session): string {
+  return `${session.season ?? 0}:${session.episode ?? 0}`;
+}
+
 export async function recomputeWatchState(key: TitleKey): Promise<void> {
   const sessions = await db.sessions.where('titleKey').equals(key).toArray();
   if (sessions.length === 0) return;
 
-  const watched = isComplete(unionCoverage(sessions.map((s) => s.coverage)));
-  const completeSessions = sessions.filter((s) => s.complete === 1).length;
+  const movie = await db.movies.get(key);
+  if (!movie) return;
+
+  /*
+   * Coverage only ever unions within a single episode.
+   *
+   * Unioning across a whole series was actively wrong: two half-watched
+   * episodes covering opposite halves would add up to "complete", marking a
+   * show watched that had never been finished once. Grouping by episode makes
+   * films a group of one, so they behave exactly as before.
+   */
+  const groups = new Map<string, Session[]>();
+  for (const session of sessions) {
+    const group = episodeKey(session);
+    groups.set(group, [...(groups.get(group) ?? []), session]);
+  }
+
+  let finishedGroups = 0;
+  let rewatches = 0;
+
+  for (const group of groups.values()) {
+    if (isComplete(unionCoverage(group.map((s) => s.coverage)))) finishedGroups++;
+    // A second complete session of the same episode is a rewatch of it.
+    rewatches += Math.max(0, group.filter((s) => s.complete === 1).length - 1);
+  }
+
+  if (movie.mediaType === 'tv') {
+    // A series is never "finished" the way a film is; it accumulates. Watched
+    // here means at least one episode has been seen through.
+    await db.movies.update(key, {
+      watched: finishedGroups > 0 ? 1 : 0,
+      episodesWatched: finishedGroups,
+      rewatch: rewatches,
+    });
+    return;
+  }
 
   await db.movies.update(key, {
-    watched: watched ? 1 : 0,
-    rewatch: Math.max(0, completeSessions - 1),
+    watched: finishedGroups > 0 ? 1 : 0,
+    rewatch: rewatches,
   });
+}
+
+export interface WatchedEpisode {
+  season: number;
+  episode: number;
+  lastSeenAt: number;
+}
+
+/** Episodes of a series that have been seen through, newest first. */
+export async function watchedEpisodes(key: TitleKey): Promise<WatchedEpisode[]> {
+  const sessions = await db.sessions.where('titleKey').equals(key).toArray();
+
+  const groups = new Map<string, Session[]>();
+  for (const session of sessions) {
+    if (session.season === undefined || session.episode === undefined) continue;
+    const group = episodeKey(session);
+    groups.set(group, [...(groups.get(group) ?? []), session]);
+  }
+
+  const out: WatchedEpisode[] = [];
+  for (const group of groups.values()) {
+    if (!isComplete(unionCoverage(group.map((s) => s.coverage)))) continue;
+    out.push({
+      season: group[0].season!,
+      episode: group[0].episode!,
+      lastSeenAt: Math.max(...group.map((s) => s.lastSeenAt)),
+    });
+  }
+
+  return out.sort((a, b) => b.season - a.season || b.episode - a.episode);
 }
 
 /**

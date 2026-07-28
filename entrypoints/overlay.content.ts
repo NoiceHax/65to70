@@ -1,6 +1,12 @@
 import { browser } from 'wxt/browser';
 import { badgeText, findLibraryMatch } from '@/lib/overlayMatch';
-import type { LibraryEntry, LibraryResponse } from '@/lib/messages';
+import { showToast } from '@/lib/toast';
+import type {
+  LibraryEntry,
+  LibraryResponse,
+  SearchQueryResponse,
+  WatchlistAddMessage,
+} from '@/lib/messages';
 
 /**
  * Search result overlay.
@@ -67,9 +73,77 @@ function annotate(): void {
   }
 }
 
+/** The query, from whichever engine this is. All three use `q`. */
+function searchQuery(): string | null {
+  try {
+    const query = new URL(location.href).searchParams.get('q');
+    return query && query.trim().length > 0 ? query.trim() : null;
+  } catch {
+    return null;
+  }
+}
+
+let offeredFor = '';
+
+/**
+ * Offer to save a searched film.
+ *
+ * Searching for something is a statement of interest, and right now is the
+ * cheapest moment to save it — cheaper than remembering to add it later, which
+ * is the step everyone skips. Only ever asks once per query, and only when the
+ * background is confident the query names a real title that isn't already
+ * known.
+ */
+async function offerWatchlist(): Promise<void> {
+  const query = searchQuery();
+  if (!query || query === offeredFor) return;
+  offeredFor = query;
+
+  let response: SearchQueryResponse | undefined;
+  try {
+    response = (await browser.runtime.sendMessage({
+      type: 'search-query',
+      query,
+    })) as SearchQueryResponse | undefined;
+  } catch {
+    return;
+  }
+
+  const match = response?.match;
+  if (!match) return;
+
+  const reply = (message: WatchlistAddMessage) => {
+    browser.runtime.sendMessage(message).catch(() => {});
+  };
+
+  showToast({
+    title: match.title,
+    year: match.year,
+    prompt: 'Save this to your watchlist?',
+    confirmLabel: 'Add',
+    dismissLabel: 'No thanks',
+    // Rating something you haven't watched makes no sense.
+    showStars: false,
+    onConfirm: () =>
+      reply({
+        type: 'watchlist-add',
+        tmdbId: match.tmdbId,
+        mediaType: match.mediaType,
+        title: match.title,
+        year: match.year,
+      }),
+    onDismiss: () => {},
+    onIgnore: () => {},
+  });
+}
+
 export default defineContentScript({
   registration: 'runtime',
   async main() {
+    void offerWatchlist();
+    // Search pages rewrite themselves as the query is refined.
+    setInterval(() => void offerWatchlist(), 2_000);
+
     try {
       const response = (await browser.runtime.sendMessage({
         type: 'library-request',
