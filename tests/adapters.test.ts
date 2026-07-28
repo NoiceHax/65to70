@@ -111,6 +111,37 @@ describe('JW Player', () => {
     });
   });
 
+  it('reads the episode from a second secondary line', () => {
+    // A real series page splits them: one line has the year and season count,
+    // another the episode. Reading only the first recorded whole series as
+    // films.
+    const doc = docFrom(`
+      <body>
+        <div class="jw-title-primary">Lock Upp</div>
+        <div class="jw-title-secondary jw-reset-text">2026 U/A 16+ 1 Seasons</div>
+        <div class="jw-title-secondary player-ep-info">Ep. 9 - Greed v/s Need</div>
+      </body>`);
+
+    const meta = readAdapterMeta(doc, url, 'net52.cc');
+    expect(meta).toMatchObject({ episode: 9, season: 1, yearHint: 2026 });
+    expect(cleanTitle(meta!.rawTitle)).toMatchObject({ title: 'Lock Upp', mediaType: 'tv' });
+  });
+
+  it('reports a known episode even when the season is not stated', () => {
+    // "3 Seasons" is a count, not a number — it does not say which one is
+    // playing. Inventing a season would put wrong data in a diary.
+    const doc = docFrom(`
+      <body>
+        <div class="jw-title-primary">Some Show</div>
+        <div class="jw-title-secondary">2024 3 Seasons</div>
+        <div class="jw-title-secondary player-ep-info">Ep. 4</div>
+      </body>`);
+
+    const meta = readAdapterMeta(doc, url, 'net52.cc');
+    expect(meta?.episode).toBe(4);
+    expect(meta?.season).toBeUndefined();
+  });
+
   it('returns null when no JW Player is present', () => {
     expect(readAdapterMeta(docFrom('<body><h1>Home</h1></body>'), url, 'net52.cc')).toBeNull();
   });

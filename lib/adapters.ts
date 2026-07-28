@@ -197,6 +197,22 @@ export function parseJwSecondary(text: string): {
 } {
   const out: { year?: number; runtimeMinutes?: number; season?: number; episode?: number } = {};
 
+  /*
+   * "Ep. 9 - Greed v/s Need" — episode stated on its own.
+   *
+   * Read before anything else, because a season may not be stated at all: this
+   * player writes "1 Seasons", a count rather than a number, and never says
+   * which season is playing. So the episode can be certain while the season is
+   * genuinely unknown, and those are recorded separately rather than folded
+   * into a string that would have to invent the missing half.
+   */
+  const bareEpisode = text.match(/\bEp(?:isode)?\.?\s*(\d{1,3})\b/i);
+  if (bareEpisode) out.episode = Number(bareEpisode[1]);
+
+  // A single-season show is the one case where the count settles the number.
+  const seasonCount = text.match(/\b(\d{1,2})\s*Seasons?\b/i);
+  if (seasonCount && Number(seasonCount[1]) === 1) out.season = 1;
+
   const year = text.match(/\b(19\d{2}|20\d{2})\b/);
   if (year) out.year = Number(year[1]);
 
@@ -260,13 +276,25 @@ const jwPlayer: SiteAdapter = {
     const title = text(doc, '.jw-title-primary');
     if (!title) return null;
 
-    const secondary = text(doc, '.jw-title-secondary');
+    // Every secondary line, not just the first. A series splits them: one
+    // carries the year and season count, another the episode. Reading only
+    // the first found the year and missed the episode entirely, which recorded
+    // whole series as films.
+    const secondary = Array.from(doc.querySelectorAll('.jw-title-secondary'))
+      .map((el) => el.textContent?.trim() ?? '')
+      .filter(Boolean)
+      .join(' · ');
+
     const parsed = secondary ? parseJwSecondary(secondary) : {};
 
     return {
+      // Folded into the title only when both halves are known, since the string
+      // form cannot express a certain episode in an unknown season.
       rawTitle: withEpisode(title, parsed.season, parsed.episode),
       strategy: 'manual',
       yearHint: parsed.year,
+      season: parsed.season,
+      episode: parsed.episode,
     };
   },
 };

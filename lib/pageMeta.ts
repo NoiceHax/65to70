@@ -17,6 +17,16 @@ export interface PageMetaResult {
   strategy: DetectionStrategy;
   /** Structured-data year, when the page provided one. */
   yearHint?: number;
+  /**
+   * Season and episode, when a source stated them outright.
+   *
+   * Separate from the title string because they aren't always both knowable.
+   * One player names the episode but only the *number of seasons* — so the
+   * episode is certain and the season isn't, which a "Show S1E9" string cannot
+   * express without inventing the part it doesn't know.
+   */
+  season?: number;
+  episode?: number;
 }
 
 const SCHEMA_TYPES = new Set([

@@ -88,8 +88,17 @@ export function bestTitle(state: TabState): (CleanedTitle & { raw: string }) | n
     const cleaned = cleanTitle(candidate.rawTitle);
     if (!isUsableTitle(cleaned)) continue;
 
+    // A source that stated the episode outright beats one parsed out of a
+    // title string — and can express a known episode in an unknown season,
+    // which the string form cannot.
+    const season = cleaned.season ?? candidate.season;
+    const episode = cleaned.episode ?? candidate.episode;
+
     return {
       ...cleaned,
+      season,
+      episode,
+      mediaType: episode !== undefined ? 'tv' : cleaned.mediaType,
       year: cleaned.year ?? candidate.yearHint,
       raw: candidate.rawTitle,
     };
