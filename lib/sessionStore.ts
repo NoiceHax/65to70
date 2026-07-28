@@ -5,6 +5,7 @@ import { rankCandidates, type PageMetaResult } from './pageMeta';
 import { refreshBadge } from './badge';
 import { liveFramesForTab } from './frames';
 import { wasDismissed } from './dismissed';
+import { resolvePending } from './resolver';
 import { SAMPLE_INTERVAL_MS, bucketIndex, bucketsCovered } from './progress';
 import type { UrlIdCandidate } from './urlIds';
 import type {
@@ -445,7 +446,6 @@ async function createPending(
   // user opens it. Resolution never marks anything watched — that still needs
   // an explicit confirmation.
   try {
-    const { resolvePending } = await import('./resolver');
     const outcome = await resolvePending(pendingId);
     console.log('[keeper] resolution:', outcome.status, outcome.message ?? '');
 

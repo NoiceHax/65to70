@@ -1,6 +1,7 @@
-import { db } from './db';
+import { db, recomputeWatchState } from './db';
 import { getSettings } from './settings';
-import { findByImdbId, search, verifyId, TmdbError, type TmdbTitle } from './tmdb';
+import { rememberDismissed } from './dismissed';
+import { findByImdbId, getById, search, verifyId, TmdbError, type TmdbTitle } from './tmdb';
 import { isDecisive, rankMatches, type ScoredCandidate } from './match';
 import { lookupLocal, lookupLocalById } from './titleIndex';
 import { titleKey, type MediaType, type Movie, type PendingDetection, type Source } from './types';
@@ -285,7 +286,6 @@ export async function confirmPending(
   await db.movies.update(movie.key, { lastConfirmed: Date.now() });
   await db.pending.delete(pendingId);
 
-  const { recomputeWatchState } = await import('./db');
   await recomputeWatchState(movie.key);
 
   return movie;
@@ -344,7 +344,6 @@ export async function confirmCandidate(
 
   if (settings.tmdbApiKey) {
     try {
-      const { getById } = await import('./tmdb');
       const detailed = await getById(tmdbId, mediaType, {
         apiKey: settings.tmdbApiKey,
         language: settings.language,
@@ -397,7 +396,6 @@ export async function dismissPending(pendingId: number): Promise<void> {
   if (!pending) return;
 
   if (pending.cleanedTitle) {
-    const { rememberDismissed } = await import('./dismissed');
     await rememberDismissed(pending.hostname, pending.cleanedTitle);
   }
 

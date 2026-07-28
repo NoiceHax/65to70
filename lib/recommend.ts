@@ -1,5 +1,6 @@
 import { db } from './db';
 import { loadSimilarIndex } from './similar';
+import { upsertMovie } from './resolver';
 import { providersForMany } from './providers';
 import { isOnWatchlist } from './watchlist';
 import { titleKey, type Movie } from './types';
@@ -155,8 +156,6 @@ export async function recommendationReadiness(): Promise<{
 
 /** Save a recommendation to the watchlist. */
 export async function saveRecommendation(rec: Recommendation): Promise<void> {
-  const { upsertMovie } = await import('./resolver');
-
   await upsertMovie(
     { tmdbId: rec.tmdbId, mediaType: 'movie', title: rec.title, year: rec.year },
     { kind: 'added', platform: 'recommendation', at: new Date().toISOString().slice(0, 10) },
