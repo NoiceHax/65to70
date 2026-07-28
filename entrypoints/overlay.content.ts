@@ -1,5 +1,9 @@
 import { browser } from 'wxt/browser';
-import { badgeText, findLibraryMatch } from '@/lib/overlayMatch';
+import {
+  badgeText,
+  findLibraryMatch,
+  searchLooksLikeScreenTitle,
+} from '@/lib/overlayMatch';
 import { showToast } from '@/lib/toast';
 import type {
   LibraryEntry,
@@ -97,6 +101,13 @@ let offeredFor = '';
 async function offerWatchlist(): Promise<void> {
   const query = searchQuery();
   if (!query || query === offeredFor) return;
+
+  // Ask the page, not the query. Matching a query against a catalogue of tens
+  // of thousands of titles says almost nothing about intent, because so many
+  // titles are ordinary words - which is how this ended up offering to save a
+  // film for practically every search typed.
+  if (!searchLooksLikeScreenTitle(document)) return;
+
   offeredFor = query;
 
   let response: SearchQueryResponse | undefined;
@@ -113,7 +124,13 @@ async function offerWatchlist(): Promise<void> {
   if (!match) return;
 
   const reply = (message: WatchlistAddMessage) => {
-    browser.runtime.sendMessage(message).catch(() => {});
+    // Throws synchronously once the extension has gone away, so a promise
+    // catch alone is not enough.
+    try {
+      browser.runtime.sendMessage(message)?.catch(() => {});
+    } catch {
+      /* extension reloaded */
+    }
   };
 
   showToast({
@@ -139,10 +156,12 @@ async function offerWatchlist(): Promise<void> {
 
 export default defineContentScript({
   registration: 'runtime',
-  async main() {
+  async main(ctx) {
     void offerWatchlist();
-    // Search pages rewrite themselves as the query is refined.
-    setInterval(() => void offerWatchlist(), 2_000);
+    // Search pages rewrite themselves as the query is refined. Tied to the
+    // script context so it stops when the extension reloads, rather than
+    // firing into a dead one forever.
+    ctx.setInterval(() => void offerWatchlist(), 2_000);
 
     try {
       const response = (await browser.runtime.sendMessage({

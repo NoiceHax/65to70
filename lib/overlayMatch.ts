@@ -48,6 +48,55 @@ export function findLibraryMatch(
   return null;
 }
 
+/**
+ * Sites a search engine links to when the subject is a film or a show.
+ *
+ * These appear in results and knowledge panels for screen titles and almost
+ * nothing else, which makes their presence a far better signal than anything
+ * the query text can offer.
+ */
+const FILM_REFERENCE = /(^|\.)(imdb\.com|rottentomatoes\.com|themoviedb\.org|letterboxd\.com|metacritic\.com|justwatch\.com)$/i;
+
+/** Descriptions a knowledge panel uses for screen titles. */
+const FILM_DESCRIPTION =
+  /\b(tv series|television series|web series|miniseries|feature film|American film|film series|directed by|season \d|episodes?\b.*\bseasons?)\b/i;
+
+/**
+ * Whether this search is actually about something watchable.
+ *
+ * The query on its own cannot answer this. A great many titles are ordinary
+ * words - "Up", "Her", "It", "Ghost", "Frozen" - so matching the query against
+ * a catalogue of tens of thousands says almost nothing about intent, and using
+ * it alone offered to save a film for practically every search typed.
+ *
+ * The results page does answer it. A search about a film links to film
+ * databases and carries a panel describing it as one; a search about anything
+ * else does neither.
+ */
+export function searchLooksLikeScreenTitle(root: ParentNode): boolean {
+  for (const link of Array.from(root.querySelectorAll('a[href]'))) {
+    const href = link.getAttribute('href') ?? '';
+    try {
+      // Search engines wrap outbound links, so the target may be a parameter.
+      const url = new URL(href, 'https://example.invalid');
+      const target = url.searchParams.get('q') ?? url.searchParams.get('url') ?? href;
+      const { hostname } = new URL(target, 'https://example.invalid');
+      if (FILM_REFERENCE.test(hostname)) return true;
+    } catch {
+      // Relative or malformed; nothing to read.
+    }
+  }
+
+  // Knowledge panels are short and descriptive. Long prose is an article that
+  // merely mentions a film.
+  for (const element of Array.from(root.querySelectorAll('span, div, h2'))) {
+    const text = element.textContent?.trim() ?? '';
+    if (text.length > 0 && text.length <= 80 && FILM_DESCRIPTION.test(text)) return true;
+  }
+
+  return false;
+}
+
 /** The line shown next to a matched result. */
 export function badgeText(entry: LibraryEntry): string {
   const bits: string[] = [];
