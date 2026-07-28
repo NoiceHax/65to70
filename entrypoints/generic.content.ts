@@ -2,7 +2,7 @@ import { browser } from 'wxt/browser';
 import { extractPageMeta } from '@/lib/pageMeta';
 import { readAdapterMeta } from '@/lib/adapters';
 import { extractUrlIds } from '@/lib/urlIds';
-import { bucketIndex, bucketsCovered } from '@/lib/progress';
+import { bucketIndex, bucketsCovered, effectiveDuration } from '@/lib/progress';
 import { showToast } from '@/lib/toast';
 import type {
   ConfirmPromptMessage,
@@ -59,11 +59,14 @@ function send(message: PageMetaMessage | MediaProgressMessage): void {
 }
 
 function usableDuration(el: HTMLVideoElement): boolean {
-  return Number.isFinite(el.duration) && el.duration >= MIN_DURATION_SEC;
+  return effectiveDuration(el) >= MIN_DURATION_SEC;
 }
 
 function recordCoverage(el: HTMLVideoElement, now: number): void {
-  const bucket = bucketIndex(el.currentTime, el.duration);
+  // Deliberately the duration captured at attach time, not a fresh reading.
+  // A seekable range can grow while buffering, and re-deriving it every sample
+  // would shift what each bucket means partway through the film.
+  const bucket = bucketIndex(el.currentTime, trackedDuration);
   const covered = bucketsCovered(
     lastSampleBucket >= 0 ? lastSampleBucket : null,
     bucket,
@@ -101,9 +104,16 @@ function onTimeUpdate(): void {
 
   // An ad break or a switch to the next episode replaces the media on the same
   // element. Close out the old session rather than merging two films.
-  if (Math.abs(media.duration - trackedDuration) > DURATION_EPSILON_SEC) {
+  //
+  // The threshold is relative, not a flat few seconds. A seekable range grows
+  // as a stream buffers, and a fixed epsilon would read that ordinary growth as
+  // a new film — tearing down and restarting the session over and over, losing
+  // all coverage each time. A genuine ad-to-feature switch changes the duration
+  // by an order of magnitude, so it still trips this easily.
+  const changeThreshold = Math.max(DURATION_EPSILON_SEC, trackedDuration * 0.2);
+  if (Math.abs(effectiveDuration(media) - trackedDuration) > changeThreshold) {
     flush(true);
-    trackedDuration = media.duration;
+    trackedDuration = effectiveDuration(media);
     lastSampleBucket = -1;
     lastSampleAt = 0;
   }
@@ -138,7 +148,7 @@ function attach(el: HTMLVideoElement): void {
   detach();
 
   media = el;
-  trackedDuration = el.duration;
+  trackedDuration = effectiveDuration(el);
   lastSampleBucket = -1;
   lastSampleAt = 0;
 
@@ -184,9 +194,16 @@ function reportState(): void {
   }
 
   if (all > 0 && usable === 0) {
-    // Almost always an ad or a preview loop rather than the feature.
+    // Print the raw values. "None usable" hides the difference between an ad
+    // (short but valid), a stream whose manifest hasn't parsed yet (NaN), and
+    // an unbounded stream (Infinity) — which need completely different fixes.
+    const seen = Array.from(document.querySelectorAll('video'))
+      .map((el) => `duration=${el.duration} effective=${effectiveDuration(el)}`)
+      .join('; ');
+
     console.log(
-      `[keeper] ${location.hostname}: ${all} video element(s), none over ${MIN_DURATION_SEC}s`,
+      `[keeper] ${location.hostname}: ${all} video element(s), none over ${MIN_DURATION_SEC}s —`,
+      seen,
     );
     return;
   }
@@ -359,8 +376,29 @@ export default defineContentScript({
     });
     observer.observe(document.documentElement, { childList: true, subtree: true });
 
-    // Backstop for titles set without a DOM mutation we can observe.
-    setInterval(reportPageMeta, META_POLL_MS);
+    /*
+     * Media readiness is not a DOM mutation, and this is what broke detection
+     * on a real site.
+     *
+     * A streaming player inserts its <video> long before it knows the runtime:
+     * with Media Source Extensions the duration is NaN until the manifest is
+     * parsed. The observer above fires on the insertion, sees NaN, rejects the
+     * element as too short — and then never looks again, because the duration
+     * arriving later changes no markup at all.
+     *
+     * These events are the signal that the answer has changed. Captured at the
+     * document, since the element is usually replaced rather than reused.
+     */
+    for (const event of ['loadedmetadata', 'durationchange', 'canplay', 'playing']) {
+      document.addEventListener(event, scanForMedia, { capture: true });
+    }
+
+    // Backstop for titles set without a DOM mutation we can observe, and for
+    // players that populate seekable without firing anything useful.
+    setInterval(() => {
+      reportPageMeta();
+      scanForMedia();
+    }, META_POLL_MS);
 
     // Last chance to persist progress before the frame goes away.
     window.addEventListener('pagehide', () => flush(true));

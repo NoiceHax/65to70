@@ -8,6 +8,36 @@ import { COVERAGE_BUCKETS } from './types';
  * marking a film watched.
  */
 
+/** The parts of a media element this module needs. Keeps it testable. */
+export interface DurationSource {
+  duration: number;
+  seekable?: { length: number; end(index: number): number };
+}
+
+/**
+ * Runtime in seconds, or 0 if not yet knowable.
+ *
+ * `video.duration` is not dependable on streaming sites. Players built on Media
+ * Source Extensions — which is most of them — report `NaN` until the manifest
+ * is parsed, and `Infinity` for streams whose end isn't declared. In both cases
+ * the real runtime is in `seekable`, which is what the player's own scrub bar
+ * reads.
+ *
+ * Getting this wrong is not a subtle degradation: a NaN duration fails the
+ * minimum-length check, so the film is dismissed as an advert and nothing is
+ * ever recorded.
+ */
+export function effectiveDuration(el: DurationSource): number {
+  if (Number.isFinite(el.duration) && el.duration > 0) return el.duration;
+
+  if (el.seekable && el.seekable.length > 0) {
+    const end = el.seekable.end(el.seekable.length - 1);
+    if (Number.isFinite(end) && end > 0) return end;
+  }
+
+  return 0;
+}
+
 export function bucketIndex(currentTimeSec: number, durationSec: number): number {
   if (!Number.isFinite(durationSec) || durationSec <= 0) return 0;
   const bucket = Math.floor((currentTimeSec / durationSec) * COVERAGE_BUCKETS);

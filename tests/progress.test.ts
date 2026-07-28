@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bucketIndex, bucketsCovered } from '@/lib/progress';
+import { bucketIndex, bucketsCovered, effectiveDuration } from '@/lib/progress';
 import { coverageRatio, emptyCoverage, isComplete, unionCoverage } from '@/lib/db';
 
 const SAMPLE_MS = 5_000;
@@ -13,6 +13,39 @@ function cover(indices: number[]): Uint8Array {
 function range(from: number, to: number): number[] {
   return Array.from({ length: to - from + 1 }, (_, i) => from + i);
 }
+
+describe('effectiveDuration', () => {
+  const seekable = (end: number) => ({ length: 1, end: () => end });
+
+  it('uses the duration when it is a real number', () => {
+    expect(effectiveDuration({ duration: 6480 })).toBe(6480);
+  });
+
+  it('falls back to seekable when the manifest has not parsed yet', () => {
+    // The real failure on cineby: a streaming player inserts its <video> with
+    // duration NaN, so the film was rejected as too short and nothing was ever
+    // recorded.
+    expect(effectiveDuration({ duration: NaN, seekable: seekable(6480) })).toBe(6480);
+  });
+
+  it('falls back to seekable for an unbounded stream', () => {
+    expect(effectiveDuration({ duration: Infinity, seekable: seekable(6480) })).toBe(6480);
+  });
+
+  it('returns 0 when nothing is knowable yet', () => {
+    expect(effectiveDuration({ duration: NaN })).toBe(0);
+    expect(effectiveDuration({ duration: NaN, seekable: { length: 0, end: () => 0 } })).toBe(0);
+  });
+
+  it('ignores a zero-length seekable range', () => {
+    expect(effectiveDuration({ duration: NaN, seekable: seekable(0) })).toBe(0);
+  });
+
+  it('prefers a real duration over seekable', () => {
+    // While buffering, seekable trails the true runtime.
+    expect(effectiveDuration({ duration: 6480, seekable: seekable(120) })).toBe(6480);
+  });
+});
 
 describe('bucketIndex', () => {
   it('maps position to a percentage bucket', () => {
