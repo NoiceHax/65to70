@@ -1,0 +1,158 @@
+import type { PageMetaResult } from './pageMeta';
+
+/**
+ * Tier 1 — per-platform readers.
+ *
+ * The premium services are the one place Tier 2 genuinely can't work. Netflix's
+ * document title is just "Netflix" on every page, and Prime's is close to
+ * useless, because neither has any reason to court search engines for content
+ * they own. The title is in the player chrome instead.
+ *
+ * Each adapter emits an ordinary `PageMetaResult` with the `manual` strategy,
+ * which outranks every generic source. Crucially it emits a *string* in a shape
+ * the existing cleaner already understands ("Breaking Bad S1E2") rather than a
+ * bespoke structure — so season and episode parsing, ranking and matching all
+ * carry over unchanged.
+ *
+ * An adapter that returns null costs nothing: the generic cascade runs anyway.
+ * That's the intended failure mode when a site redesigns.
+ */
+
+export interface SiteAdapter {
+  id: string;
+  matches(hostname: string): boolean;
+  read(doc: Document, url: string): PageMetaResult | null;
+}
+
+function text(doc: Document, selector: string): string | null {
+  const value = doc.querySelector(selector)?.textContent?.trim();
+  return value && value.length > 0 ? value : null;
+}
+
+/** Fold structured season/episode into the form cleanTitle already parses. */
+function withEpisode(title: string, season?: number, episode?: number): string {
+  if (season === undefined || episode === undefined) return title;
+  return `${title} S${season}E${episode}`;
+}
+
+// ---------------------------------------------------------------------------
+// Netflix
+// ---------------------------------------------------------------------------
+
+const netflix: SiteAdapter = {
+  id: 'netflix',
+  matches: (hostname) => /(^|\.)netflix\.com$/.test(hostname),
+
+  read(doc, url) {
+    // Only meaningful during playback; the browse pages have no single title.
+    if (!/\/watch\/\d+/.test(url)) return null;
+
+    const container = doc.querySelector('[data-uia="video-title"]');
+    if (!container) return null;
+
+    // Films render a bare title. Series render the show in an <h4> with the
+    // season/episode and episode name in following spans.
+    const series = container.querySelector('h4')?.textContent?.trim();
+    const parts = Array.from(container.querySelectorAll('span'))
+      .map((el) => el.textContent?.trim() ?? '')
+      .filter(Boolean);
+
+    if (!series) {
+      const film = container.textContent?.trim();
+      return film ? { rawTitle: film, strategy: 'manual' } : null;
+    }
+
+    const marker = parts.find((part) => /^S\d+\s*:\s*E\d+/i.test(part));
+    const match = marker?.match(/^S(\d+)\s*:\s*E(\d+)/i);
+
+    return {
+      rawTitle: withEpisode(
+        series,
+        match ? Number(match[1]) : undefined,
+        match ? Number(match[2]) : undefined,
+      ),
+      strategy: 'manual',
+    };
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Prime Video
+// ---------------------------------------------------------------------------
+
+const primeVideo: SiteAdapter = {
+  id: 'prime',
+  matches: (hostname) =>
+    /(^|\.)primevideo\.com$/.test(hostname) || /(^|\.)amazon\.[a-z.]+$/.test(hostname),
+
+  read(doc) {
+    const title =
+      text(doc, '.atvwebplayersdk-title-text') ??
+      text(doc, '[data-automation-id="title"]');
+    if (!title) return null;
+
+    // Series carry a subtitle like "S1 E2 - Episode Name".
+    const subtitle = text(doc, '.atvwebplayersdk-subtitle-text');
+    const match = subtitle?.match(/S(\d+)\s*[·:]?\s*E(\d+)/i);
+
+    return {
+      rawTitle: withEpisode(
+        title,
+        match ? Number(match[1]) : undefined,
+        match ? Number(match[2]) : undefined,
+      ),
+      strategy: 'manual',
+    };
+  },
+};
+
+// ---------------------------------------------------------------------------
+// JioHotstar
+// ---------------------------------------------------------------------------
+
+const hotstar: SiteAdapter = {
+  id: 'hotstar',
+  matches: (hostname) => /(^|\.)hotstar\.com$/.test(hostname),
+
+  read(doc, url) {
+    // Hotstar's watch URLs carry a readable slug, which survives even when the
+    // player chrome hasn't rendered yet:
+    //   /in/movies/inception/1260022016/watch
+    const slugMatch = url.match(
+      /\/(?:movies|shows|sports)\/([^/]+)\/\d+(?:\/\d+)*(?:\/watch)?/i,
+    );
+
+    const fromPlayer = text(doc, '.player-title') ?? text(doc, '[class*="title"]');
+    const fromSlug = slugMatch
+      ? decodeURIComponent(slugMatch[1]).replace(/[-_]+/g, ' ').trim()
+      : null;
+
+    const title = fromPlayer ?? fromSlug;
+    if (!title || title.length < 2) return null;
+
+    return { rawTitle: title, strategy: 'manual' };
+  },
+};
+
+const ADAPTERS: SiteAdapter[] = [netflix, primeVideo, hotstar];
+
+export function adapterFor(hostname: string): SiteAdapter | null {
+  return ADAPTERS.find((adapter) => adapter.matches(hostname)) ?? null;
+}
+
+/** Read a Tier 1 title for this page, or null to fall through to Tier 2. */
+export function readAdapterMeta(
+  doc: Document,
+  url: string,
+  hostname: string,
+): PageMetaResult | null {
+  const adapter = adapterFor(hostname);
+  if (!adapter) return null;
+
+  try {
+    return adapter.read(doc, url);
+  } catch {
+    // A site redesign must never take the extension down with it.
+    return null;
+  }
+}

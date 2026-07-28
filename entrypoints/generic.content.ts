@@ -1,5 +1,6 @@
 import { browser } from 'wxt/browser';
 import { extractPageMeta } from '@/lib/pageMeta';
+import { readAdapterMeta } from '@/lib/adapters';
 import { extractUrlIds } from '@/lib/urlIds';
 import { bucketIndex, bucketsCovered } from '@/lib/progress';
 import type { MediaProgressMessage, PageMetaMessage } from '@/lib/messages';
@@ -175,7 +176,15 @@ function reportPageMeta(): void {
   if (now - lastMetaCheckAt < META_THROTTLE_MS) return;
   lastMetaCheckAt = now;
 
-  const candidates = extractPageMeta(document, location.href);
+  // Tier 1 first. On the premium services this is the only source that works —
+  // their document titles say nothing, because they have no reason to court
+  // search engines for content they own.
+  const adapterMeta = readAdapterMeta(document, location.href, location.hostname);
+  const candidates = [
+    ...(adapterMeta ? [adapterMeta] : []),
+    ...extractPageMeta(document, location.href),
+  ];
+
   const urlIds = extractUrlIds(location.href);
   if (candidates.length === 0 && urlIds.length === 0) return;
 
