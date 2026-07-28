@@ -12,6 +12,7 @@
     "zip": "wxt zip",
     "zip:firefox": "wxt zip -b firefox",
     "compile": "tsc --noEmit",
+    "probe": "vite-node scripts/probe.ts --",
     "test": "vitest run",
     "test:watch": "vitest",
     "postinstall": "wxt prepare"
@@ -26,6 +27,7 @@
     "@types/react-dom": "^19.2.3",
     "@wxt-dev/module-react": "^1.1.5",
     "fake-indexeddb": "^6.2.5",
+    "happy-dom": "^20.11.1",
     "typescript": "^5.9.3",
     "vitest": "^4.1.10",
     "web-ext": "^10.5.0",

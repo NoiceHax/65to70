@@ -5,7 +5,7 @@ export default defineConfig({
   modules: ['@wxt-dev/module-react'],
   manifest: {
     name: 'Keeper',
-    action: { default_title: 'Keeper' },
+    // The action title comes from the popup entrypoint's <title>, not here.
     description:
       'Local-first watch tracker and universal watchlist. Your history never leaves your machine.',
     permissions: [
