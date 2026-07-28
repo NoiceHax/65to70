@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import ConfirmQueue from './views/ConfirmQueue';
 import Library from './views/Library';
 import Watchlist from './views/Watchlist';
+import WatchNext from './views/WatchNext';
 import Sites from './views/Sites';
 import './App.css';
 
@@ -59,7 +60,12 @@ function App() {
       </nav>
 
       {tab === 'queue' && <ConfirmQueue key={version} onChange={bump} />}
-      {tab === 'watchlist' && <Watchlist key={version} />}
+      {tab === 'watchlist' && (
+        <>
+          <WatchNext key={`next-${version}`} />
+          <Watchlist key={version} />
+        </>
+      )}
       {tab === 'library' && <Library key={version} />}
       {tab === 'sites' && <Sites onChange={bump} />}
 
