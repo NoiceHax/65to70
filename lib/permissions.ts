@@ -123,7 +123,23 @@ export function originPatternFor(url: string): string | null {
  * runtime registrations across restarts, so this also repairs drift if a user
  * revokes a permission through Chrome's own UI rather than ours.
  */
-export async function syncContentScripts(): Promise<void> {
+/**
+ * Serialises registration.
+ *
+ * This is called from five places - install, startup, permission added,
+ * permission removed, and each grant - and several of those fire together. Two
+ * concurrent runs both read the registration list as empty and both try to
+ * register, which fails with a duplicate id and leaves a script unregistered
+ * entirely. Chaining onto the previous run makes that impossible.
+ */
+let syncQueue: Promise<void> = Promise.resolve();
+
+export function syncContentScripts(): Promise<void> {
+  syncQueue = syncQueue.then(runSync, runSync);
+  return syncQueue;
+}
+
+async function runSync(): Promise<void> {
   const origins = await grantedOrigins();
   const { excludedOrigins, trackingPaused } = await getSettings();
 
@@ -186,7 +202,15 @@ export async function syncContentScripts(): Promise<void> {
       }
       console.log(`[keeper] registered ${script.id} for:`, matches.join(', '));
     } catch (error) {
-      console.error(`[keeper] FAILED to register ${script.id}:`, error);
+      // Something registered it between the read above and here. Replacing it
+      // is the recovery: the alternative is a script that never registers.
+      try {
+        await browser.scripting.unregisterContentScripts({ ids: [script.id] });
+        await browser.scripting.registerContentScripts([registration]);
+        console.log(`[keeper] re-registered ${script.id} for:`, matches.join(', '));
+      } catch (retryError) {
+        console.error(`[keeper] could not register ${script.id}:`, retryError, error);
+      }
     }
   }
 }

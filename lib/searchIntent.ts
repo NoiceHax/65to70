@@ -1,9 +1,9 @@
 import { db } from './db';
 import { titleKey } from './types';
-import { lookupLocal } from './titleIndex';
+import { searchLocalTitles } from './titleIndex';
 import { getSettings } from './settings';
 import { getById, search, type TmdbTitle } from './tmdb';
-import { isDecisive, rankMatches } from './match';
+import { isDecisive, normalizeTitle, rankMatches } from './match';
 import { addToWatchlist, isOnWatchlist } from './watchlist';
 import type { SearchQueryResponse } from './messages';
 
@@ -69,7 +69,12 @@ export async function offerFromSearch(query: string): Promise<SearchQueryRespons
 
   // Local index first, exactly as watch detection does - a search shouldn't be
   // the thing that starts sending queries to TMDB.
-  let candidates = await lookupLocal(trimmed);
+  //
+  // Ordered rather than exact-matched, because a bare exact match is useless
+  // here: "Wednesday" is a dozen titles, none of them decisively better than
+  // the others, so the strict rule offered nothing at all for exactly the
+  // queries people actually type.
+  let candidates = await searchLocalTitles(trimmed, 10);
 
   if (candidates.length === 0 && settings.tmdbApiKey && settings.allowNetworkResolve) {
     candidates = await search(trimmed, 'movie', undefined, {
@@ -81,9 +86,21 @@ export async function offerFromSearch(query: string): Promise<SearchQueryRespons
   if (candidates.length === 0) return {};
 
   const ranked = rankMatches({ title: trimmed }, candidates);
-  if (!isDecisive(ranked)) return {};
+  const best = ranked[0]?.candidate;
+  if (!best) return {};
 
-  const best = ranked[0].candidate;
+  /*
+   * Offer the newest exact match, or nothing.
+   *
+   * Someone typing a title into a search box almost always means a current
+   * one, and the index is already ordered newest-first within an exact-match
+   * tier. Requiring the name to match exactly keeps the bar high - an
+   * unwanted watchlist entry is more irritating than a missing one - while
+   * still answering the ambiguous case instead of staying silent.
+   */
+  if (normalizeTitle(best.title) !== normalizeTitle(trimmed) && !isDecisive(ranked)) {
+    return {};
+  }
   const key = titleKey(best.mediaType, best.tmdbId);
 
   // Nothing to offer if it's already watched or already saved.

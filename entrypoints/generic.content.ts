@@ -55,10 +55,27 @@ let lastMetaSignature = '';
 let lastMetaCheckAt = 0;
 let metaDebounce: ReturnType<typeof setTimeout> | null = null;
 
+/**
+ * Whether this script still belongs to a live extension.
+ *
+ * Reloading the extension leaves the previous content script running in every
+ * open page, attached to an extension that no longer exists. Sending from that
+ * state throws "Extension context invalidated" - and throws *synchronously*, so
+ * a `.catch()` on the returned promise never sees it, which is why those errors
+ * were uncaught and repeating.
+ */
+let alive = true;
+
 function send(message: PageMetaMessage | MediaProgressMessage): void {
-  // The worker may be asleep or the extension reloading; neither is worth
-  // surfacing to the page.
-  browser.runtime.sendMessage(message).catch(() => {});
+  if (!alive) return;
+
+  try {
+    // The worker may also simply be asleep; neither case is worth surfacing.
+    browser.runtime.sendMessage(message)?.catch(() => {});
+  } catch {
+    // The extension went away. Stop trying, and stop everything else too.
+    alive = false;
+  }
 }
 
 /**
@@ -272,19 +289,24 @@ function reportState(): void {
   }
 
   if (all === 0 && frames.length > 0) {
-    // The single most common reason nothing gets recorded: the player lives in
-    // a frame this extension has no permission to touch. Players are named
-    // separately from ad frames - these pages carry plenty of both, and only
-    // one of them is worth granting anything to.
+    /*
+     * Only worth saying on a page that looks like somewhere you watch things.
+     *
+     * Every page has iframes. Saying "no video here" on a search results page,
+     * a chat client or a social feed is noise that buries the one message that
+     * matters, and it was `console.warn`, so all of it landed in the browser's
+     * error list as though something had broken.
+     */
     const players = frames.filter((f) => f.likelyPlayer).map((f) => f.origin);
-    const others = frames.filter((f) => !f.likelyPlayer).map((f) => f.origin);
+    if (players.length === 0 && !/[/?&](watch|play|movie|episode)\b/i.test(location.href)) {
+      return;
+    }
 
-    console.warn(
+    console.log(
       `[keeper] ${location.hostname}: no video here.`,
       players.length > 0
         ? `Player looks like ${players.join(', ')} - grant it in the popup.`
         : 'No player-shaped frame found.',
-      others.length > 0 ? `(also embedded, probably ads: ${others.join(', ')})` : '',
     );
     return;
   }
@@ -333,9 +355,14 @@ function embeddedFrames(): { origin: string; likelyPlayer: boolean }[] {
     if (!src) continue;
 
     try {
-      const { origin, protocol, href } = new URL(src, location.href);
+      const { origin, protocol, href, hostname } = new URL(src, location.href);
       if (protocol !== 'http:' && protocol !== 'https:') continue;
       if (origin === location.origin) continue;
+
+      // A malformed src like "//undefined/..." parses cleanly into an origin of
+      // "https://undefined", which is nothing and cannot be granted. Requiring a
+      // dot in the hostname discards those without discarding anything real.
+      if (!hostname.includes('.')) continue;
 
       // A player is big. Standard ad units are 300x250 or 728x90, so requiring
       // both a wide and a tall box excludes them without excluding a real
@@ -464,7 +491,20 @@ function handleConfirmPrompt(msg: ConfirmPromptMessage): void {
 
 export default defineContentScript({
   registration: 'runtime',
-  main() {
+  main(ctx) {
+    /*
+     * Tie every timer and listener to the script's lifetime.
+     *
+     * Reloading the extension leaves this script running in every open page,
+     * attached to an extension that no longer exists, and raw intervals kept
+     * firing into it forever - which is where the repeating "Extension context
+     * invalidated" errors came from. `ctx` clears its own timers when that
+     * happens.
+     */
+    ctx.onInvalidated(() => {
+      alive = false;
+    });
+
     browser.runtime.onMessage.addListener((message) => {
       const msg = message as ConfirmPromptMessage;
       if (msg?.type === 'confirm-prompt') handleConfirmPrompt(msg);
@@ -510,7 +550,7 @@ export default defineContentScript({
 
     // Backstop for titles set without a DOM mutation we can observe, and for
     // players that populate seekable without firing anything useful.
-    setInterval(() => {
+    ctx.setInterval(() => {
       reportPageMeta();
       scanForMedia();
     }, META_POLL_MS);
