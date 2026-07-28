@@ -13,6 +13,9 @@ node_modules
 # Generated indexes. Large, rebuildable, and regenerated weekly — they belong
 # in the options page, not in history.
 pipeline/out
+
+# Local secrets.
+.env
 stats.html
 stats-*.json
 .wxt

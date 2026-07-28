@@ -17,17 +17,18 @@
  */
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
+import { tmdbApiKey } from '../scripts/env';
 
 const API = 'https://api.themoviedb.org/3';
 const MAX_PAGE = 500;
 const FIRST_YEAR = 1950;
 const LAST_YEAR = new Date().getFullYear() + 1;
 
-const apiKey = process.env.TMDB_API_KEY;
+const apiKey = tmdbApiKey();
 const region = (process.argv[2] ?? 'IN').toUpperCase();
 
 if (!apiKey) {
-  console.error('Set TMDB_API_KEY. Get a free v3 key at themoviedb.org → Settings → API.');
+  console.error('No TMDB key. Put TMDB_API_KEY in .env, or set it in the environment.');
   process.exit(1);
 }
 

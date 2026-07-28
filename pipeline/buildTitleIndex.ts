@@ -25,15 +25,16 @@ import { writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { Readable } from 'node:stream';
 import { createInterface } from 'node:readline';
+import { tmdbApiKey } from '../scripts/env';
 
 const API = 'https://api.themoviedb.org/3';
 const CONCURRENCY = 20;
 
-const apiKey = process.env.TMDB_API_KEY;
+const apiKey = tmdbApiKey();
 const limit = Number(process.argv[2] ?? 40000);
 
 if (!apiKey) {
-  console.error('Set TMDB_API_KEY. Get a free v3 key at themoviedb.org → Settings → API.');
+  console.error('No TMDB key. Put TMDB_API_KEY in .env, or set it in the environment.');
   process.exit(1);
 }
 
