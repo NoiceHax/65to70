@@ -5,6 +5,7 @@ import { rankCandidates, type PageMetaResult } from './pageMeta';
 import { refreshBadge } from './badge';
 import { liveFramesForTab } from './frames';
 import { wasDismissed } from './dismissed';
+import { indexCovers } from './titleIndex';
 import { resolvePending } from './resolver';
 import { SAMPLE_INTERVAL_MS, bucketIndex, bucketsCovered } from './progress';
 import type { UrlIdCandidate } from './urlIds';
@@ -481,11 +482,23 @@ async function createPending(
      * against. That's a setup problem, not a verdict, and discarding on it
      * would silently throw away real viewing.
      */
+    /*
+     * Silence is only evidence if we had somewhere to look.
+     *
+     * An index of films says nothing whatever about a series, and reading that
+     * as "not a real title" deleted genuine viewing without a word - a show
+     * would be read correctly, matched against data that could never contain
+     * it, and discarded. Anything the index cannot cover is kept.
+     */
+    const kind = pending.season !== undefined || pending.episode !== undefined ? 'tv' : 'movie';
+    const searchable = await indexCovers(kind);
+
     const matched =
       outcome.status === 'resolved' ||
       outcome.candidates.length > 0 ||
       urlIds.length > 0 ||
-      outcome.status === 'offline';
+      outcome.status === 'offline' ||
+      !searchable;
 
     if (!matched) {
       console.log('[keeper] discarded, matched nothing:', pending.cleanedTitle);

@@ -1,6 +1,7 @@
 import { db } from './db';
 import { normalizeTitle } from './match';
 import type { TmdbTitle } from './tmdb';
+import type { MediaType } from './types';
 
 /**
  * Offline title lookup.
@@ -21,11 +22,22 @@ interface IndexEntry {
   y?: number;
   r?: number;
   a?: string[];
+  /** Present for series. Absent means a film, which is the bulk of the file. */
+  m?: 'tv';
 }
 
 interface StoredIndex {
   generatedAt: string;
   entries: IndexEntry[];
+  /**
+   * What this index actually contains.
+   *
+   * Matters because "no match" only means "not a real title" if the index
+   * could have held it. An index of films alone says nothing at all about a
+   * series, and treating its silence as a verdict silently discarded real
+   * viewing. Older files predate the field and were films only.
+   */
+  mediaTypes?: MediaType[];
 }
 
 const META_KEY = 'titleIndex';
@@ -94,11 +106,27 @@ export async function titleIndexStatus(): Promise<{
 function toTmdbTitle(entry: IndexEntry): TmdbTitle {
   return {
     tmdbId: entry.i,
-    mediaType: 'movie',
+    mediaType: entry.m === 'tv' ? 'tv' : 'movie',
     title: entry.t,
     year: entry.y,
     runtime: entry.r,
   };
+}
+
+/**
+ * Whether the index could have held a title of this kind.
+ *
+ * The caller uses this to decide if "no match" is evidence of anything. An
+ * index of films alone is silent about every series, and reading that silence
+ * as "not a real title" threw away real viewing without a word.
+ */
+export async function indexCovers(mediaType: MediaType): Promise<boolean> {
+  const entry = await db.meta.get(META_KEY);
+  if (!entry) return false;
+
+  const stored = entry.value as StoredIndex;
+  // Files built before the field existed contained films only.
+  return (stored.mediaTypes ?? ['movie']).includes(mediaType);
 }
 
 /**
