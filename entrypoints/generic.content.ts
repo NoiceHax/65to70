@@ -170,9 +170,30 @@ function attach(el: HTMLVideoElement): void {
   }
 }
 
+/**
+ * Every video element in the frame, including inside shadow roots.
+ *
+ * `querySelectorAll` does not cross a shadow boundary, and several embed
+ * players render their player into one. To a plain query those pages contain no
+ * video at all — indistinguishable from a page that genuinely has none, which
+ * is the least useful way for this to fail.
+ *
+ * Closed shadow roots stay unreachable; nothing can be done about those.
+ */
+function findVideos(root: Document | ShadowRoot = document): HTMLVideoElement[] {
+  const found: HTMLVideoElement[] = Array.from(root.querySelectorAll('video'));
+
+  for (const element of Array.from(root.querySelectorAll('*'))) {
+    const shadow = (element as HTMLElement).shadowRoot;
+    if (shadow) found.push(...findVideos(shadow));
+  }
+
+  return found;
+}
+
 /** Prefer a video that's actually playing; fall back to the longest one. */
 function pickVideo(): HTMLVideoElement | null {
-  const videos = Array.from(document.querySelectorAll('video')).filter(looksLikeContent);
+  const videos = findVideos().filter(looksLikeContent);
   if (videos.length === 0) return null;
 
   const playing = videos.filter((v) => !v.paused && !v.ended);
@@ -185,8 +206,8 @@ function pickVideo(): HTMLVideoElement | null {
 let lastReported = '';
 
 function reportState(): void {
-  const all = document.querySelectorAll('video').length;
-  const usable = Array.from(document.querySelectorAll('video')).filter(looksLikeContent).length;
+  const all = findVideos().length;
+  const usable = findVideos().filter(looksLikeContent).length;
   const frames = embeddedFrames();
 
   const state = `${all}:${usable}:${frames.map((f) => f.origin).join(',')}:${media ? 'attached' : 'none'}`;
@@ -206,7 +227,7 @@ function reportState(): void {
     // Print the raw values. "None usable" hides the difference between an ad
     // (short but valid), a stream whose manifest hasn't parsed yet (NaN), and
     // an unbounded stream (Infinity) — which need completely different fixes.
-    const seen = Array.from(document.querySelectorAll('video'))
+    const seen = findVideos()
       .map((el) => `duration=${el.duration} effective=${effectiveDuration(el)}`)
       .join('; ');
 
