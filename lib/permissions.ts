@@ -169,6 +169,22 @@ async function runSync(): Promise<void> {
         ? origins.filter(isSearchOrigin)
         : origins.filter((origin) => !isSearchOrigin(origin));
 
+    // Keep the tracker off search engines, always.
+    //
+    // Filtering the granted list is not enough once an all-sites grant exists,
+    // because the catch-all pattern is not itself a search origin and so
+    // matches everything including them. The tracker then ran on results
+    // pages, saw the YouTube frames there, concluded the page was somewhere
+    // you watch things, and queued the search query itself as something
+    // watched, while the overlay offered to add the same query to the
+    // watchlist. Two prompts, both wrong.
+    //
+    // Nobody watches a film on a results page, so this is unconditional.
+    const exclusions =
+      script.scope === 'search'
+        ? excludedOrigins
+        : [...excludedOrigins, ...SEARCH_ORIGINS];
+
     // An empty matches array is invalid, so unregister instead of registering
     // a script that can never run.
     if (matches.length === 0) {
@@ -185,7 +201,7 @@ async function runSync(): Promise<void> {
       // Excluded at registration, not filtered afterwards. Nothing of ours
       // runs on these origins, so there is no title to leak because none is
       // ever read.
-      ...(excludedOrigins.length > 0 ? { excludeMatches: excludedOrigins } : {}),
+      ...(exclusions.length > 0 ? { excludeMatches: exclusions } : {}),
       // Embedded players are commonly cross-origin iframes; the title usually
       // lives in the parent frame, so both need the tracker.
       allFrames: script.allFrames,
