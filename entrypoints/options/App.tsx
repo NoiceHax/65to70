@@ -8,6 +8,17 @@ import {
   saveAvailabilityIndex,
   type AvailabilityIndex,
 } from '@/lib/providers';
+import { buildDiaryCsv } from '@/lib/sync/letterboxd';
+import {
+  disconnect,
+  isConnected,
+  poll,
+  requestCode,
+  saveToken,
+  syncTo,
+  type DeviceCodeGrant,
+} from '@/lib/sync/trackers';
+import type { SyncProvider } from '@/lib/types';
 import './App.css';
 
 const REGIONS = ['IN', 'US', 'GB', 'CA', 'AU', 'DE', 'FR', 'JP', 'BR', 'SG'];
@@ -19,6 +30,11 @@ function App() {
   const [titleIndex, setTitleIndex] = useState({ loaded: false, titles: 0 });
   const [availability, setAvailability] = useState({ loaded: false, titles: 0, region: '' });
   const [indexError, setIndexError] = useState<string | null>(null);
+  const [connected, setConnected] = useState({ simkl: false, trakt: false });
+  const [grant, setGrant] = useState<{ provider: SyncProvider; code: DeviceCodeGrant } | null>(
+    null,
+  );
+  const [syncNote, setSyncNote] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     setSettings(await getSettings());
@@ -29,7 +45,73 @@ function App() {
     });
     setTitleIndex(await titleIndexStatus());
     setAvailability(await availabilityStatus());
+    setConnected({
+      simkl: await isConnected('simkl'),
+      trakt: await isConnected('trakt'),
+    });
   }, []);
+
+  /**
+   * Device flow: show the user a code, then poll until they've approved it.
+   * Polling respects the interval the service asked for — going faster gets
+   * the request throttled, not answered sooner.
+   */
+  const connect = async (provider: SyncProvider) => {
+    setSyncNote(null);
+    try {
+      const code = await requestCode(provider);
+      setGrant({ provider, code });
+
+      const deadline = Date.now() + code.expiresIn * 1000;
+      while (Date.now() < deadline) {
+        await new Promise((r) => setTimeout(r, code.intervalSeconds * 1000));
+
+        const token = await poll(provider, code.deviceCode);
+        if (!token) continue;
+
+        await saveToken(provider, token);
+        setGrant(null);
+        setSyncNote(`Connected to ${provider}.`);
+        await refresh();
+        return;
+      }
+
+      setGrant(null);
+      setSyncNote('The code expired before it was approved.');
+    } catch (error) {
+      setGrant(null);
+      setSyncNote((error as Error).message);
+    }
+  };
+
+  const pushNow = async (provider: SyncProvider) => {
+    setSyncNote(null);
+    try {
+      const count = await syncTo(provider);
+      setSyncNote(
+        count === 0 ? 'Already up to date.' : `Sent ${count} entries to ${provider}.`,
+      );
+    } catch (error) {
+      setSyncNote((error as Error).message);
+    }
+  };
+
+  const downloadCsv = async () => {
+    const { csv, rows } = await buildDiaryCsv();
+    if (rows === 0) {
+      setSyncNote('Nothing confirmed as watched yet.');
+      return;
+    }
+
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'letterboxd-diary.csv';
+    link.click();
+    URL.revokeObjectURL(url);
+    setSyncNote(`${rows} diary entries exported.`);
+  };
 
   const loadIndexFile = async (file: File, kind: 'titles' | 'availability') => {
     setIndexError(null);
@@ -146,6 +228,112 @@ function App() {
             ))}
           </select>
         </label>
+      </section>
+
+      <section>
+        <h2>Sync out</h2>
+        <p className="note">
+          Only titles you have confirmed are ever sent. Register your own app
+          with each service and paste its credentials — an extension can't keep
+          a shared secret, since anything in the bundle is readable by anyone
+          who installs it.
+        </p>
+
+        <label className="field">
+          <span>Simkl client id</span>
+          <input
+            type="password"
+            value={settings.simklClientId ?? ''}
+            onChange={(e) => void update({ simklClientId: e.target.value.trim() })}
+          />
+        </label>
+
+        <div className="index-row">
+          <div>
+            <strong>Simkl</strong>
+            <em>{connected.simkl ? 'Connected' : 'Not connected'}</em>
+          </div>
+          <div className="index-actions">
+            {connected.simkl ? (
+              <>
+                <button onClick={() => void pushNow('simkl')}>Sync now</button>
+                <button
+                  onClick={async () => {
+                    await disconnect('simkl');
+                    await refresh();
+                  }}
+                >
+                  Disconnect
+                </button>
+              </>
+            ) : (
+              <button onClick={() => void connect('simkl')}>Connect</button>
+            )}
+          </div>
+        </div>
+
+        <label className="field">
+          <span>Trakt client id</span>
+          <input
+            type="password"
+            value={settings.traktClientId ?? ''}
+            onChange={(e) => void update({ traktClientId: e.target.value.trim() })}
+          />
+        </label>
+        <label className="field">
+          <span>Trakt client secret</span>
+          <input
+            type="password"
+            value={settings.traktClientSecret ?? ''}
+            onChange={(e) => void update({ traktClientSecret: e.target.value.trim() })}
+          />
+        </label>
+
+        <div className="index-row">
+          <div>
+            <strong>Trakt</strong>
+            <em>{connected.trakt ? 'Connected' : 'Not connected'}</em>
+          </div>
+          <div className="index-actions">
+            {connected.trakt ? (
+              <>
+                <button onClick={() => void pushNow('trakt')}>Sync now</button>
+                <button
+                  onClick={async () => {
+                    await disconnect('trakt');
+                    await refresh();
+                  }}
+                >
+                  Disconnect
+                </button>
+              </>
+            ) : (
+              <button onClick={() => void connect('trakt')}>Connect</button>
+            )}
+          </div>
+        </div>
+
+        <div className="index-row">
+          <div>
+            <strong>Letterboxd</strong>
+            <em>
+              Letterboxd has no public write API, so this is a file you upload
+              yourself at letterboxd.com/import. Likes aren't part of their
+              import format and have to be re-applied by hand.
+            </em>
+          </div>
+          <div className="index-actions">
+            <button onClick={() => void downloadCsv()}>Export CSV</button>
+          </div>
+        </div>
+
+        {grant && (
+          <p className="note grant">
+            Open <strong>{grant.code.verificationUrl}</strong> and enter{' '}
+            <strong>{grant.code.userCode}</strong>. Waiting for approval…
+          </p>
+        )}
+        {syncNote && <p className="note">{syncNote}</p>}
       </section>
 
       <section>

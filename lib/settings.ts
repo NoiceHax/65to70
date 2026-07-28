@@ -31,6 +31,19 @@ export interface Settings {
 
   /** ISO language for titles, so regional titles come back the way they appear. */
   language: string;
+
+  /**
+   * Tracker application credentials.
+   *
+   * Supplied by the user from their own registered app rather than baked into
+   * the bundle. An extension is a public client — anything shipped inside it is
+   * readable by anyone who installs it, so a shared secret would not be secret.
+   * Trakt's device flow requires a secret at token exchange, which is why it
+   * needs both fields; Simkl's PIN flow needs only the id.
+   */
+  simklClientId?: string;
+  traktClientId?: string;
+  traktClientSecret?: string;
 }
 
 const DEFAULTS: Settings = {
