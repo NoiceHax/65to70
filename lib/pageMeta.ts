@@ -219,6 +219,37 @@ const GENERIC_DOMAIN_PARTS = new Set([
   'app', 'site', 'online', 'stream', 'watch', 'movies', 'ru', 'in', 'uk', 'is',
 ]);
 
+/**
+ * Whether the page is showing something episodic.
+ *
+ * Controls give it away long before any title does: an episode list, a next
+ * episode button, a season picker. A film page has none of them, so their
+ * presence is a strong signal on its own - and it is available even when the
+ * URL carries no id and the title says nothing about seasons.
+ *
+ * Worth having because the alternative is guessing, and guessing film when
+ * something is a series is how one id resolved to an entirely unrelated title.
+ */
+const SERIES_CONTROL = /^(episodes?|next episode|episode list|episode selector|seasons?)$/i;
+
+export function looksLikeSeries(root: ParentNode): boolean {
+  const controls = root.querySelectorAll(
+    'button, a, [role="button"], [role="tab"], h2, h3, span, div',
+  );
+
+  for (const control of Array.from(controls)) {
+    const label = control.getAttribute('aria-label') ?? control.textContent ?? '';
+    const text = label.trim();
+    // Short strings only: a synopsis mentioning episodes is not a control.
+    if (text.length > 0 && text.length <= 20 && SERIES_CONTROL.test(text)) return true;
+  }
+
+  return false;
+}
+
+/** Same separators the cleaner splits on, so both agree what a segment is. */
+const SEGMENT = /\s+[|–—»·]\s+|\s+-\s+/;
+
 function normalizeForCompare(text: string): string {
   return text.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
 }
@@ -231,6 +262,39 @@ export function brandTokens(hostname: string): Set<string> {
     tokens.add(part);
   }
   return tokens;
+}
+
+/**
+ * Remove the site's own name from a page title.
+ *
+ * Almost every site appends it - "Adarsh Baal Vidyalaya - Cineby" - and
+ * carrying it into matching costs accuracy for no benefit, since a catalogue
+ * has never heard of the site. Ranking already rejects a title that is nothing
+ * but the brand; this handles the far more common case where the brand is one
+ * segment alongside the real answer.
+ *
+ * Only whole segments are removed, never words inside one, so a film whose
+ * title happens to contain the site's name survives intact.
+ */
+export function stripBrand(rawTitle: string, hostname: string): string {
+  const brands = brandTokens(hostname);
+  if (brands.size === 0) return rawTitle;
+
+  const segments = rawTitle.split(SEGMENT).filter((segment) => segment.trim().length > 0);
+  if (segments.length < 2) return rawTitle;
+
+  const kept = segments.filter((segment) => {
+    const normalized = normalizeForCompare(segment);
+    for (const brand of brands) {
+      if (normalized === brand) return false;
+      // "Prime Video" against the brand "primevideo", or "Cineby.cc" against
+      // "cineby": a segment that is the brand plus a little decoration.
+      if (normalized.includes(brand) && normalized.length <= brand.length + 6) return false;
+    }
+    return true;
+  });
+
+  return kept.length > 0 ? kept.join(' - ') : rawTitle;
 }
 
 function scoreCandidate(candidate: PageMetaResult, brands: Set<string>): number {

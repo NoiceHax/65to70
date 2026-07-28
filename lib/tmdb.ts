@@ -142,12 +142,35 @@ export async function verifyId(
   hint: MediaType | undefined,
   options: RequestOptions,
 ): Promise<TmdbTitle | null> {
-  const order: MediaType[] = hint === 'tv' ? ['tv', 'movie'] : ['movie', 'tv'];
-  for (const mediaType of order) {
-    const found = await getById(tmdbId, mediaType, options);
-    if (found) return found;
-  }
-  return null;
+  // With a hint there is nothing to guess: check only what was asked for.
+  if (hint) return getById(tmdbId, hint, options);
+
+  const found = await findAllById(tmdbId, options);
+  return found.length === 1 ? found[0] : null;
+}
+
+/**
+ * Everything that exists under this id, in either collection.
+ *
+ * Films and series occupy separate id spaces, so the same number is very often
+ * a valid entry in both and they are entirely unrelated. Checking one first and
+ * taking the answer looks decisive and is arbitrary - it identified a 2015 film
+ * as the series someone was actually watching, purely because films were tried
+ * first.
+ *
+ * So both are checked and the caller decides. One hit settles it. Two mean the
+ * id alone cannot say which, and something else has to.
+ */
+export async function findAllById(
+  tmdbId: number,
+  options: RequestOptions,
+): Promise<TmdbTitle[]> {
+  const [movie, tv] = await Promise.all([
+    getById(tmdbId, 'movie', options),
+    getById(tmdbId, 'tv', options),
+  ]);
+
+  return [movie, tv].filter((found): found is TmdbTitle => found !== null);
 }
 
 interface FindResponse {

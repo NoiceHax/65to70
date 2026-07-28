@@ -1,7 +1,7 @@
 import { browser } from 'wxt/browser';
 import { coverageRatio, db, emptyCoverage, isComplete } from './db';
 import { cleanTitle, isUsableTitle, type CleanedTitle } from './titleClean';
-import { rankCandidates, type PageMetaResult } from './pageMeta';
+import { rankCandidates, stripBrand, type PageMetaResult } from './pageMeta';
 import { refreshBadge } from './badge';
 import { liveFramesForTab } from './frames';
 import { wasDismissed } from './dismissed';
@@ -52,6 +52,8 @@ interface TabState {
   queuedSignature?: string;
   /** Whether any injected frame reported a usable media element. */
   sawVideo?: boolean;
+  /** Whether any frame showed episode controls, which settles film vs series. */
+  isSeriesPage?: boolean;
   lastSeenUrl?: string;
 }
 
@@ -86,7 +88,9 @@ export function bestTitle(state: TabState): (CleanedTitle & { raw: string }) | n
   );
 
   for (const candidate of candidates) {
-    const cleaned = cleanTitle(candidate.rawTitle);
+    // Drop the site's own name before cleaning. A catalogue has never heard of
+    // it, so carrying it into matching costs accuracy for nothing.
+    const cleaned = cleanTitle(stripBrand(candidate.rawTitle, state.hostname ?? ''));
     if (!isUsableTitle(cleaned)) continue;
 
     // A source that stated the episode outright beats one parsed out of a
@@ -95,11 +99,16 @@ export function bestTitle(state: TabState): (CleanedTitle & { raw: string }) | n
     const season = cleaned.season ?? candidate.season;
     const episode = cleaned.episode ?? candidate.episode;
 
+    // Episode controls settle the kind even when no number was found anywhere,
+    // which stops a series being matched against films.
+    const kind =
+      episode !== undefined || state.isSeriesPage ? 'tv' : cleaned.mediaType;
+
     return {
       ...cleaned,
       season,
       episode,
-      mediaType: episode !== undefined ? 'tv' : cleaned.mediaType,
+      mediaType: kind,
       year: cleaned.year ?? candidate.yearHint,
       raw: candidate.rawTitle,
     };
@@ -119,6 +128,9 @@ export async function handlePageMeta(tabId: number, msg: PageMetaMessage): Promi
 
   // Any frame finding a video is enough; they report independently.
   if (msg.hasVideo) state.sawVideo = true;
+  // Likewise for episode controls: the player frame usually has them and the
+  // page around it usually does not.
+  if (msg.isSeriesPage) state.isSeriesPage = true;
 
   if (msg.isTopFrame) {
     state.metaTop = msg.candidates;

@@ -83,9 +83,14 @@ export function seasonEpisodeFromUrl(
 
   try {
     const params = new URL(url).searchParams;
-    const season = Number(params.get('season'));
-    const episode = Number(params.get('episode'));
-    if (season >= 1 && episode >= 1) return { season, episode };
+
+    // Both the spelled-out names and the short pair. `s` and `e` alone are far
+    // too generic to read, so they only count when they appear together, which
+    // is unambiguous in practice.
+    const season = Number(params.get('season') ?? params.get('s'));
+    const episode = Number(params.get('episode') ?? params.get('e'));
+
+    if (season >= 1 && season <= 50 && episode >= 1) return { season, episode };
   } catch {
     // Not a URL we can parse; the patterns above already had their chance.
   }

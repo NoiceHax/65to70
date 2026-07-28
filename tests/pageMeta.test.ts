@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from 'vitest';
-import { brandTokens, extractPageMeta, rankCandidates } from '@/lib/pageMeta';
+import { brandTokens, extractPageMeta, rankCandidates, stripBrand } from '@/lib/pageMeta';
 import { cleanTitle } from '@/lib/titleClean';
 
 function docFrom(html: string): Document {
@@ -118,6 +118,35 @@ describe('brandTokens', () => {
   it('drops the TLD and www', () => {
     expect([...brandTokens('cineby.cc')]).toEqual(['cineby']);
     expect([...brandTokens('www.fmovies.to')]).toEqual(['fmovies']);
+  });
+});
+
+describe('stripBrand', () => {
+  it('removes the site name from a trailing segment', () => {
+    // Ranking rejects a title that is only the brand. This is the far more
+    // common case: the brand alongside the real answer.
+    expect(stripBrand('Adarsh Baal Vidyalaya - Cineby', 'cineby.cc')).toBe(
+      'Adarsh Baal Vidyalaya',
+    );
+  });
+
+  it('removes it from a leading segment', () => {
+    expect(stripBrand('FMovies | Interstellar', 'fmovies.to')).toBe('Interstellar');
+  });
+
+  it('keeps a title that merely contains the brand as a word', () => {
+    // Only whole segments are removed, so a real title survives intact.
+    expect(stripBrand('Cinema Paradiso - Something', 'cinema.to')).toBe(
+      'Cinema Paradiso - Something',
+    );
+  });
+
+  it('leaves a single-segment title alone', () => {
+    expect(stripBrand('Cineby', 'cineby.cc')).toBe('Cineby');
+  });
+
+  it('does nothing when there is no brand to find', () => {
+    expect(stripBrand('Interstellar - 2014', '')).toBe('Interstellar - 2014');
   });
 });
 

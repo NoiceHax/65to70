@@ -28,6 +28,16 @@ export interface PageMetaMessage {
   hasVideo: boolean;
 
   /**
+   * Whether the page is showing something episodic.
+   *
+   * Read from the controls rather than the title: an episode list or a next
+   * episode button is present on a series page and absent on a film one. It
+   * settles the kind even when the URL carries no id, and guessing film when
+   * something is a series is how one id resolved to an unrelated title.
+   */
+  isSeriesPage: boolean;
+
+  /**
    * Cross-origin iframes on the page.
    *
    * Streaming sites routinely serve the player from a separate domain. Host

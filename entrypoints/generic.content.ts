@@ -1,5 +1,5 @@
 import { browser } from 'wxt/browser';
-import { extractPageMeta } from '@/lib/pageMeta';
+import { extractPageMeta, looksLikeSeries } from '@/lib/pageMeta';
 import { readAdapterMeta } from '@/lib/adapters';
 import { PLAYER_URL } from '@/lib/frames';
 import { extractUrlIds } from '@/lib/urlIds';
@@ -378,6 +378,7 @@ function reportPageMeta(): void {
   const signature = JSON.stringify([
     location.href,
     candidates.map((c) => `${c.strategy}:${c.rawTitle}`),
+    looksLikeSeries(document),
     urlIds.map((i) => `${i.source}:${i.id}:${i.season ?? ''}:${i.episode ?? ''}`),
     embedded,
     hasVideo,
@@ -393,6 +394,7 @@ function reportPageMeta(): void {
     hostname: location.hostname,
     isTopFrame,
     hasVideo,
+    isSeriesPage: looksLikeSeries(document),
     embeddedFrames: embedded,
   });
 }

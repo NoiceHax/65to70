@@ -1,8 +1,15 @@
 import { db, recomputeWatchState } from './db';
 import { getSettings } from './settings';
 import { rememberDismissed } from './dismissed';
-import { findByImdbId, getById, search, verifyId, TmdbError, type TmdbTitle } from './tmdb';
-import { isDecisive, rankMatches, type ScoredCandidate } from './match';
+import {
+  findAllById,
+  findByImdbId,
+  getById,
+  search,
+  TmdbError,
+  type TmdbTitle,
+} from './tmdb';
+import { isDecisive, rankMatches, scoreMatch, type ScoredCandidate } from './match';
 import { lookupLocal, lookupLocalById, searchLocalTitles } from './titleIndex';
 import { titleKey, type MediaType, type Movie, type PendingDetection, type Source } from './types';
 
@@ -88,17 +95,29 @@ export async function upsertMovie(found: TmdbTitle, source: Source): Promise<Mov
   return merged;
 }
 
+/**
+ * Everything a URL id could be pointing at.
+ *
+ * Returns a list rather than a single answer because an id often is not one.
+ * Films and series have separate id spaces, so the same number is frequently a
+ * valid entry in both, and picking whichever was checked first is a guess
+ * dressed as a fact - it once reported a 2015 film as the series being watched.
+ *
+ * A hint settles it when the page gave one. Without a hint, two hits are
+ * reported as two and something else decides.
+ */
 async function resolveByUrlIds(
   pending: PendingDetection,
   apiKey: string,
   language: string,
-): Promise<TmdbTitle | null> {
+  hint: MediaType | undefined,
+): Promise<TmdbTitle[]> {
   for (const id of pending.urlIds ?? []) {
     const options = { apiKey, language };
 
     if (id.source === 'imdb') {
       const found = await findByImdbId(id.id, options);
-      if (found) return found;
+      if (found) return [found];
       continue;
     }
 
@@ -108,11 +127,18 @@ async function resolveByUrlIds(
     // A bare path number could be a site-internal id, so it only counts if
     // TMDB actually has it. A miss costs one request and falls through to
     // title matching.
-    const found = await verifyId(numeric, id.mediaType, options);
-    if (found) return found;
+    const kind = id.mediaType ?? hint;
+    if (kind) {
+      const found = await getById(numeric, kind, options);
+      if (found) return [found];
+      continue;
+    }
+
+    const found = await findAllById(numeric, options);
+    if (found.length > 0) return found;
   }
 
-  return null;
+  return [];
 }
 
 /**
@@ -142,24 +168,72 @@ export async function resolvePending(pendingId: number): Promise<ResolveOutcome>
     // 1. Ids from the URL settle it outright when they verify. Verification
     //    needs the network, so this step is skipped without a key rather than
     //    aborting - the local index below works without one.
-    const byId = settings.tmdbApiKey
-      ? await resolveByUrlIds(pending, settings.tmdbApiKey, settings.language)
-      : null;
+    const byIds = settings.tmdbApiKey
+      ? await resolveByUrlIds(pending, settings.tmdbApiKey, settings.language, mediaType)
+      : [];
 
-    if (byId) {
-      const movie = await upsertMovie(byId, source);
-      await db.pending.update(pendingId, {
-        candidates: [
-          {
-            tmdbId: byId.tmdbId,
-            mediaType: byId.mediaType,
-            title: byId.title,
-            year: byId.year,
-            score: 1,
-          },
-        ],
-      });
-      return { status: 'resolved', movie, candidates: [{ candidate: byId, score: 1 }] };
+    if (byIds.length > 0) {
+      /*
+       * Check the id against what the page says before believing it.
+       *
+       * An id is only as good as the assumption that the site meant the same
+       * catalogue we do. Nothing was comparing the two, so a number that
+       * happened to exist was accepted outright and a 2015 film was reported
+       * as the series actually playing.
+       *
+       * When the page named something, the id has to agree with it. When the
+       * page named nothing usable - which is common, since these are the sites
+       * whose markup gives least - there is nothing to check against and a
+       * single unambiguous id is still the best evidence available.
+       */
+      const pageTitle = pending.cleanedTitle;
+      const checked = pageTitle
+        ? byIds.filter(
+            (candidate) =>
+              scoreMatch({ title: pageTitle, year: pending.year }, candidate) >= 0.5,
+          )
+        : byIds;
+
+      if (checked.length === 1) {
+        const found = checked[0];
+        const movie = await upsertMovie(found, source);
+        await db.pending.update(pendingId, {
+          candidates: [
+            {
+              tmdbId: found.tmdbId,
+              mediaType: found.mediaType,
+              title: found.title,
+              year: found.year,
+              score: 1,
+            },
+          ],
+        });
+        return { status: 'resolved', movie, candidates: [{ candidate: found, score: 1 }] };
+      }
+
+      if (checked.length > 1) {
+        // Several plausible readings of one id. Offer them rather than pick.
+        const ranked = rankMatches({ title: pageTitle ?? '', year: pending.year }, checked);
+        await db.pending.update(pendingId, {
+          candidates: ranked.map(({ candidate, score }) => ({
+            tmdbId: candidate.tmdbId,
+            mediaType: candidate.mediaType,
+            title: candidate.title,
+            year: candidate.year,
+            score,
+          })),
+        });
+        return { status: 'ambiguous', candidates: ranked };
+      }
+
+      // The id resolved to something the page contradicts. Distrust the id and
+      // fall through to matching on the title, which is what the viewer saw.
+      console.warn(
+        '[keeper] URL id disagrees with the page:',
+        byIds.map((c) => c.title).join(', '),
+        'vs',
+        pageTitle,
+      );
     }
 
     if (!pending.cleanedTitle) {
