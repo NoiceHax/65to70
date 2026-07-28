@@ -248,6 +248,68 @@ export async function confirmPending(
   return movie;
 }
 
+/**
+ * Free-text search, for when every candidate is wrong.
+ *
+ * The escape hatch that makes the confirm queue honest: an automatic matcher
+ * will always have cases it can't reach, and the answer to those is to let the
+ * user say what it was — not to guess harder.
+ */
+export async function searchManually(
+  query: string,
+  mediaType: MediaType,
+): Promise<TmdbTitle[]> {
+  const settings = await getSettings();
+  if (!settings.tmdbApiKey || query.trim().length === 0) return [];
+
+  return search(query.trim(), mediaType, undefined, {
+    apiKey: settings.tmdbApiKey,
+    language: settings.language,
+  });
+}
+
+export interface ConfirmOptions {
+  liked?: boolean;
+  /** 0.5–5.0 in half steps, or null to leave unrated — which is the norm. */
+  rating?: number | null;
+}
+
+/**
+ * Confirm a detection against one of its candidates.
+ *
+ * Fetches full details first because the search results the queue displays are
+ * summaries — runtime and IMDb id come from the detail endpoint, and both are
+ * needed later for availability and for the Letterboxd export.
+ */
+export async function confirmCandidate(
+  pendingId: number,
+  tmdbId: number,
+  mediaType: MediaType,
+  options: ConfirmOptions = {},
+): Promise<Movie | null> {
+  const settings = await getSettings();
+  if (!settings.tmdbApiKey) return null;
+
+  const { getById } = await import('./tmdb');
+  const found = await getById(tmdbId, mediaType, {
+    apiKey: settings.tmdbApiKey,
+    language: settings.language,
+  });
+  if (!found) return null;
+
+  const movie = await confirmPending(pendingId, found);
+  if (!movie) return null;
+
+  // Only written when the user actually expressed something. An unrated film
+  // is a normal outcome, not a gap to fill in.
+  const patch: Partial<Movie> = {};
+  if (options.liked !== undefined) patch.liked = options.liked ? 1 : 0;
+  if (options.rating !== undefined) patch.rating = options.rating;
+  if (Object.keys(patch).length > 0) await db.movies.update(movie.key, patch);
+
+  return (await db.movies.get(movie.key)) ?? movie;
+}
+
 /** Drop a detection without recording anything — "this wasn't me". */
 export async function dismissPending(pendingId: number): Promise<void> {
   const pending = await db.pending.get(pendingId);

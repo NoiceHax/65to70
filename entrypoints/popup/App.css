@@ -4,6 +4,8 @@
   --muted: #6b6b76;
   --line: #e6e6ea;
   --accent: #1f6feb;
+  --field: #f7f7f9;
+  --warm: #e5484d;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -13,11 +15,15 @@
     --muted: #9a9aa5;
     --line: #2a2a31;
     --accent: #5b9bff;
+    --field: #1e1e24;
+    --warm: #ff6369;
   }
 }
 
 main {
-  width: 340px;
+  width: 360px;
+  max-height: 580px;
+  overflow-y: auto;
   padding: 14px 16px 12px;
   background: var(--bg);
   color: var(--fg);
@@ -26,7 +32,7 @@ main {
 }
 
 header {
-  margin-bottom: 14px;
+  margin-bottom: 12px;
 }
 
 h1 {
@@ -42,9 +48,48 @@ h1 {
   color: var(--muted);
 }
 
+/* Tabs ------------------------------------------------------------------ */
+
+nav {
+  display: flex;
+  gap: 2px;
+  margin-bottom: 4px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+nav button {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+nav button.on {
+  background: var(--field);
+  color: var(--fg);
+}
+
+nav .count {
+  min-width: 17px;
+  padding: 0 4px;
+  border-radius: 9px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  text-align: center;
+}
+
 section {
   padding-top: 12px;
-  border-top: 1px solid var(--line);
 }
 
 h2 {
@@ -58,7 +103,7 @@ h2 {
 
 .empty,
 .note {
-  margin: 0 0 8px;
+  margin: 10px 0;
   font-size: 12px;
   color: var(--muted);
 }
@@ -69,28 +114,161 @@ ul {
   list-style: none;
 }
 
-.resume li {
+/* Confirm queue --------------------------------------------------------- */
+
+.queue-item {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.queue-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.queue-head strong {
+  font-size: 13.5px;
+}
+
+.candidates li {
+  padding: 2px 0;
+}
+
+.candidates label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+}
+
+.search-row {
+  display: flex;
+  gap: 6px;
+  margin: 9px 0;
+}
+
+.search-row input {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 8px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--field);
+  color: var(--fg);
+  font: inherit;
+}
+
+.marks {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 8px 0;
+}
+
+.mark {
+  padding: 4px 9px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  cursor: pointer;
+}
+
+.mark.on {
+  border-color: var(--warm);
+  color: var(--warm);
+}
+
+.mark.inline {
+  padding: 0 3px;
+  border: 0;
+  font-size: 13px;
+}
+
+.stars {
+  display: flex;
+  gap: 1px;
+}
+
+.star {
+  padding: 0 2px;
+  border: 0;
+  background: transparent;
+  color: var(--line);
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.star.on {
+  color: #f5a623;
+}
+
+.actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.error {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--warm);
+}
+
+/* Library --------------------------------------------------------------- */
+
+.resume li,
+.library li {
   display: flex;
   justify-content: space-between;
   gap: 10px;
   padding: 5px 0;
 }
 
-.resume .title {
+.resume .title,
+.library .title {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.resume .year {
+.year {
   color: var(--muted);
 }
 
-.resume .meta {
+.badge {
+  margin-left: 5px;
+  padding: 0 4px;
+  border-radius: 4px;
+  background: var(--field);
+  font-size: 10px;
+  color: var(--muted);
+}
+
+.rating {
+  margin-right: 6px;
+  color: #f5a623;
+}
+
+.resume .meta,
+.library .meta {
+  display: flex;
+  align-items: center;
   flex-shrink: 0;
   font-variant-numeric: tabular-nums;
   color: var(--muted);
 }
+
+.meta {
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+/* Sites ----------------------------------------------------------------- */
 
 .sites li {
   padding: 3px 0;
@@ -103,23 +281,43 @@ ul {
   cursor: pointer;
 }
 
-button.primary {
-  width: 100%;
-  margin-bottom: 10px;
-  padding: 7px 10px;
-  border: 0;
+/* Buttons --------------------------------------------------------------- */
+
+button {
+  padding: 6px 11px;
+  border: 1px solid var(--line);
   border-radius: 6px;
+  background: var(--field);
+  color: var(--fg);
+  font: inherit;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+button.primary {
+  border-color: transparent;
   background: var(--accent);
   color: #fff;
-  font: inherit;
   font-weight: 500;
-  cursor: pointer;
+}
+
+button.link {
+  margin-top: 12px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  text-decoration: underline;
 }
 
 footer {
   display: flex;
   gap: 12px;
-  margin-top: 12px;
+  margin-top: 14px;
   padding-top: 10px;
   border-top: 1px solid var(--line);
   font-size: 11px;
