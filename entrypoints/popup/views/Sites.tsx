@@ -8,6 +8,7 @@ import {
   requestSite,
   revokeSite,
 } from '@/lib/permissions';
+import { tabDiagnostics, type TabDiagnostics } from '@/lib/sessionStore';
 
 /**
  * Per-site permissions.
@@ -20,23 +21,25 @@ export default function Sites({ onChange }: { onChange: () => void }) {
   const [origins, setOrigins] = useState<string[]>([]);
   const [tabOrigin, setTabOrigin] = useState<string | null>(null);
   const [tabHost, setTabHost] = useState<string | null>(null);
+  const [diagnostics, setDiagnostics] = useState<TabDiagnostics | null>(null);
 
   const refresh = useCallback(async () => {
     setOrigins(await grantedOrigins());
+
+    const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
+    if (tab?.id !== undefined) setDiagnostics(await tabDiagnostics(tab.id));
+    if (!tab?.url) return;
+
+    setTabOrigin(originPatternFor(tab.url));
+    try {
+      setTabHost(new URL(tab.url).hostname);
+    } catch {
+      /* not a web page */
+    }
   }, []);
 
   useEffect(() => {
     void refresh();
-    void (async () => {
-      const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
-      if (!tab?.url) return;
-      setTabOrigin(originPatternFor(tab.url));
-      try {
-        setTabHost(new URL(tab.url).hostname);
-      } catch {
-        /* not a web page */
-      }
-    })();
   }, [refresh]);
 
   const isGranted = (origin: string) => origins.includes(origin);
@@ -66,6 +69,49 @@ export default function Sites({ onChange }: { onChange: () => void }) {
         <button className="primary" onClick={() => void toggle(tabOrigin)}>
           Watch {tabHost}
         </button>
+      )}
+
+      {/* "Nothing happened" is the least actionable bug report there is.
+          Separating "script never ran" from "ran but found no video" from
+          "found a video but no title" turns it into an obvious fix. */}
+      {diagnostics && tabOrigin && isGranted(tabOrigin) && (
+        <div className="diag">
+          <div className={diagnostics.sawVideo ? 'diag-line ok' : 'diag-line warn'}>
+            {diagnostics.sawVideo
+              ? 'Player found on this page'
+              : diagnostics.scriptRan
+                ? 'Running here, but no player found yet'
+                : 'Not running on this page yet — try reloading'}
+          </div>
+
+          {diagnostics.urlIds.length > 0 && (
+            <div className="diag-line ok">Identified from URL: {diagnostics.urlIds.join(', ')}</div>
+          )}
+          {diagnostics.bestTitle && (
+            <div className="diag-line ok">Reading title: {diagnostics.bestTitle}</div>
+          )}
+
+          {!diagnostics.sawVideo &&
+            diagnostics.embeddedOrigins.filter((o) => !isGranted(`${o}/*`)).length > 0 && (
+              <>
+                <p className="note">
+                  The player is served from another domain. Permissions are
+                  per-origin, so allowing this site doesn&apos;t reach it:
+                </p>
+                {diagnostics.embeddedOrigins
+                  .filter((o) => !isGranted(`${o}/*`))
+                  .map((origin) => (
+                    <button
+                      key={origin}
+                      className="primary"
+                      onClick={() => void toggle(`${origin}/*`)}
+                    >
+                      Allow {new URL(origin).hostname}
+                    </button>
+                  ))}
+              </>
+            )}
+        </div>
       )}
 
       <ul className="sites">

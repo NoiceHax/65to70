@@ -3,6 +3,8 @@ import { syncContentScripts } from '@/lib/permissions';
 import { db } from '@/lib/db';
 import { handleMediaProgress, handlePageMeta, handleTabClosed } from '@/lib/sessionStore';
 import { librarySnapshot } from '@/lib/librarySnapshot';
+import { confirmCandidate, dismissPending } from '@/lib/resolver';
+import { refreshBadge } from '@/lib/badge';
 import type { KeeperMessage } from '@/lib/messages';
 
 export default defineBackground(() => {
@@ -32,6 +34,20 @@ export default defineBackground(() => {
       return true;
     }
 
+    // The in-page prompt. Confirming here does exactly what the queue does —
+    // there is still only one path by which anything becomes "watched".
+    if (msg.type === 'toast-action') {
+      if (msg.action === 'confirm') {
+        void confirmCandidate(msg.pendingId, msg.tmdbId, msg.mediaType, {
+          rating: msg.rating,
+        }).then(refreshBadge);
+      } else if (msg.action === 'dismiss') {
+        void dismissPending(msg.pendingId).then(refreshBadge);
+      }
+      // 'ignore' deliberately does nothing: the detection stays in the queue.
+      return;
+    }
+
     const tabId = sender.tab?.id;
     if (tabId === undefined) return;
 
@@ -51,5 +67,5 @@ export default defineBackground(() => {
   });
 
   // Opening the database here means the first popup render doesn't pay for it.
-  void db.open();
+  void db.open().then(refreshBadge);
 });

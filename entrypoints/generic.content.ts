@@ -3,7 +3,13 @@ import { extractPageMeta } from '@/lib/pageMeta';
 import { readAdapterMeta } from '@/lib/adapters';
 import { extractUrlIds } from '@/lib/urlIds';
 import { bucketIndex, bucketsCovered } from '@/lib/progress';
-import type { MediaProgressMessage, PageMetaMessage } from '@/lib/messages';
+import { showToast } from '@/lib/toast';
+import type {
+  ConfirmPromptMessage,
+  MediaProgressMessage,
+  PageMetaMessage,
+  ToastActionMessage,
+} from '@/lib/messages';
 
 /**
  * Tier 2 detection — the generic fallback for any granted site.
@@ -171,6 +177,35 @@ function scanForMedia(): void {
  * the extracted values catches the late update instead; re-sending is harmless
  * because the background merges by tab.
  */
+/**
+ * Origins of cross-origin iframes on this page.
+ *
+ * Reading an iframe's `src` attribute is just a DOM read — it needs no access
+ * to the frame's contents, so this works even though the frame itself is off
+ * limits. That's what makes it possible to tell the user which origin is
+ * missing rather than leaving them with a site that records nothing.
+ */
+function embeddedOrigins(): string[] {
+  if (!isTopFrame) return [];
+
+  const origins = new Set<string>();
+  for (const frame of Array.from(document.querySelectorAll('iframe'))) {
+    const src = frame.getAttribute('src');
+    if (!src) continue;
+
+    try {
+      const { origin, protocol } = new URL(src, location.href);
+      if (protocol !== 'http:' && protocol !== 'https:') continue;
+      if (origin === location.origin) continue;
+      origins.add(origin);
+    } catch {
+      // Relative or malformed src; nothing to grant.
+    }
+  }
+
+  return [...origins];
+}
+
 function reportPageMeta(): void {
   const now = Date.now();
   if (now - lastMetaCheckAt < META_THROTTLE_MS) return;
@@ -186,12 +221,19 @@ function reportPageMeta(): void {
   ];
 
   const urlIds = extractUrlIds(location.href);
-  if (candidates.length === 0 && urlIds.length === 0) return;
+  const embedded = embeddedOrigins();
+  const hasVideo = pickVideo() !== null;
+
+  // Still report when nothing was identifiable: knowing a page had a player in
+  // an un-granted iframe is exactly the diagnosis the popup needs to show.
+  if (candidates.length === 0 && urlIds.length === 0 && embedded.length === 0) return;
 
   const signature = JSON.stringify([
     location.href,
     candidates.map((c) => `${c.strategy}:${c.rawTitle}`),
     urlIds.map((i) => `${i.source}:${i.id}:${i.season ?? ''}:${i.episode ?? ''}`),
+    embedded,
+    hasVideo,
   ]);
   if (signature === lastMetaSignature) return;
   lastMetaSignature = signature;
@@ -203,12 +245,50 @@ function reportPageMeta(): void {
     url: location.href,
     hostname: location.hostname,
     isTopFrame,
+    hasVideo,
+    embeddedOrigins: embedded,
+  });
+}
+
+/**
+ * Show the end-of-film prompt.
+ *
+ * Only the top frame does this. An embedded player would otherwise render the
+ * toast inside its own iframe, where it may be clipped, tiny, or invisible.
+ */
+function handleConfirmPrompt(msg: ConfirmPromptMessage): void {
+  if (!isTopFrame) return;
+
+  const reply = (action: ToastActionMessage['action'], rating: number | null) => {
+    const message: ToastActionMessage = {
+      type: 'toast-action',
+      action,
+      pendingId: msg.pendingId,
+      tmdbId: msg.tmdbId,
+      mediaType: msg.mediaType,
+      rating,
+    };
+    browser.runtime.sendMessage(message).catch(() => {});
+  };
+
+  showToast({
+    title: msg.title,
+    year: msg.year,
+    onConfirm: (rating) => reply('confirm', rating),
+    onDismiss: () => reply('dismiss', null),
+    // Ignoring is not rejecting: the detection stays in the confirm queue.
+    onIgnore: () => reply('ignore', null),
   });
 }
 
 export default defineContentScript({
   registration: 'runtime',
   main() {
+    browser.runtime.onMessage.addListener((message) => {
+      const msg = message as ConfirmPromptMessage;
+      if (msg?.type === 'confirm-prompt') handleConfirmPrompt(msg);
+    });
+
     reportPageMeta();
     scanForMedia();
 

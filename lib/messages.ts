@@ -23,6 +23,21 @@ export interface PageMetaMessage {
   url: string;
   hostname: string;
   isTopFrame: boolean;
+
+  /** Whether this frame contains a usable media element. */
+  hasVideo: boolean;
+
+  /**
+   * Origins of cross-origin iframes on the page.
+   *
+   * Streaming sites routinely serve the player from a separate domain. Host
+   * permissions are per-origin and `allFrames` only injects into frames whose
+   * own URL matches a granted pattern — so granting the site the user typed
+   * does not reach the frame that actually holds the video. Reporting these
+   * lets the popup offer the missing grant instead of silently recording
+   * nothing.
+   */
+  embeddedOrigins: string[];
 }
 
 export interface MediaProgressMessage {
@@ -68,4 +83,35 @@ export interface LibraryResponse {
   entries: LibraryEntry[];
 }
 
-export type KeeperMessage = PageMetaMessage | MediaProgressMessage | LibraryRequest;
+/**
+ * Background → content script: ask the viewer, in the page, right as it ends.
+ *
+ * Only sent when the resolver already knows what it was. Asking "is this
+ * right?" about a confident guess is a reasonable interruption; asking the user
+ * to identify something from scratch mid-page is not — that belongs in the
+ * queue.
+ */
+export interface ConfirmPromptMessage {
+  type: 'confirm-prompt';
+  pendingId: number;
+  tmdbId: number;
+  mediaType: 'movie' | 'tv';
+  title: string;
+  year?: number;
+}
+
+/** Content script → background: what the viewer tapped. */
+export interface ToastActionMessage {
+  type: 'toast-action';
+  action: 'confirm' | 'dismiss' | 'ignore';
+  pendingId: number;
+  tmdbId: number;
+  mediaType: 'movie' | 'tv';
+  rating: number | null;
+}
+
+export type KeeperMessage =
+  | PageMetaMessage
+  | MediaProgressMessage
+  | LibraryRequest
+  | ToastActionMessage;

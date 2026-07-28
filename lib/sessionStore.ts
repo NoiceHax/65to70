@@ -2,8 +2,13 @@ import { browser } from 'wxt/browser';
 import { coverageRatio, db, emptyCoverage, isComplete } from './db';
 import { cleanTitle, isUsableTitle, type CleanedTitle } from './titleClean';
 import { rankCandidates, type PageMetaResult } from './pageMeta';
+import { refreshBadge } from './badge';
 import type { UrlIdCandidate } from './urlIds';
-import type { MediaProgressMessage, PageMetaMessage } from './messages';
+import type {
+  ConfirmPromptMessage,
+  MediaProgressMessage,
+  PageMetaMessage,
+} from './messages';
 import type { PendingDetection, Session } from './types';
 
 /**
@@ -34,6 +39,12 @@ interface TabState {
   metaSub?: PageMetaResult[];
   /** Catalogue ids read from the URL, top frame preferred. */
   urlIds?: UrlIdCandidate[];
+
+  /** Cross-origin iframe origins seen on the page, for the diagnostics panel. */
+  embeddedOrigins?: string[];
+  /** Whether any injected frame reported a usable media element. */
+  sawVideo?: boolean;
+  lastSeenUrl?: string;
 }
 
 const tabKey = (tabId: number) => `tab:${tabId}`;
@@ -83,10 +94,21 @@ export function bestTitle(state: TabState): (CleanedTitle & { raw: string }) | n
 export async function handlePageMeta(tabId: number, msg: PageMetaMessage): Promise<void> {
   const state = await getTabState(tabId);
 
+  // A new page means the previous diagnosis no longer applies.
+  if (msg.isTopFrame && state.lastSeenUrl !== undefined && state.lastSeenUrl !== msg.url) {
+    state.sawVideo = false;
+    state.embeddedOrigins = undefined;
+  }
+
+  // Any frame finding a video is enough; they report independently.
+  if (msg.hasVideo) state.sawVideo = true;
+
   if (msg.isTopFrame) {
     state.metaTop = msg.candidates;
     state.url = msg.url;
     state.hostname = msg.hostname;
+    state.embeddedOrigins = msg.embeddedOrigins;
+    state.lastSeenUrl = msg.url;
     if (msg.urlIds.length > 0) state.urlIds = msg.urlIds;
   } else {
     state.metaSub = msg.candidates;
@@ -170,7 +192,7 @@ export async function handleMediaProgress(
     ...(msg.ended ? { stoppedAt: Date.now() } : {}),
   });
 
-  if (justCompleted) await createPending(state, state.sessionId, msg.hostname);
+  if (justCompleted) await createPending(state, state.sessionId, msg.hostname, tabId);
 
   if (msg.ended) {
     await endSession(state.sessionId);
@@ -208,6 +230,7 @@ async function createPending(
   state: TabState,
   sessionId: number,
   hostname: string,
+  tabId: number,
 ): Promise<void> {
   const existing = await db.pending.where('sessionId').equals(sessionId).count();
   if (existing > 0) return;
@@ -240,6 +263,7 @@ async function createPending(
   };
 
   const pendingId = (await db.pending.add(pending)) as number;
+  await refreshBadge();
   console.log(
     '[keeper] queued for confirmation:',
     pending.cleanedTitle || `(by id ${urlIds.map((i) => `${i.source}:${i.id}`).join(', ')})`,
@@ -253,9 +277,60 @@ async function createPending(
     const { resolvePending } = await import('./resolver');
     const outcome = await resolvePending(pendingId);
     console.log('[keeper] resolution:', outcome.status, outcome.message ?? '');
+
+    // Ask in the page, while the credits are still rolling — but only when the
+    // resolver already knows what it was. Confirming a confident guess is a
+    // reasonable interruption; asking someone to identify a film from scratch
+    // mid-page is not, and that stays in the queue.
+    if (outcome.status === 'resolved' && outcome.movie) {
+      const prompt: ConfirmPromptMessage = {
+        type: 'confirm-prompt',
+        pendingId,
+        tmdbId: outcome.movie.tmdbId,
+        mediaType: outcome.movie.mediaType,
+        title: outcome.movie.title,
+        year: outcome.movie.year,
+      };
+      browser.tabs.sendMessage(tabId, prompt).catch(() => {
+        // Tab closed or navigated away; the queue still has it.
+      });
+    }
   } catch (error) {
     console.warn('[keeper] resolution failed', error);
   }
+}
+
+export interface TabDiagnostics {
+  /** True once any frame in the tab has reported in. */
+  scriptRan: boolean;
+  sawVideo: boolean;
+  /** Cross-origin iframe origins the page loads. */
+  embeddedOrigins: string[];
+  bestTitle: string | null;
+  urlIds: string[];
+  hasOpenSession: boolean;
+}
+
+/**
+ * What Keeper currently believes about a tab.
+ *
+ * Exists because "nothing happened" is the least actionable bug report a user
+ * can give. Distinguishing "the script never ran" from "it ran but found no
+ * video" from "it found a video but no title" turns one vague symptom into
+ * three different, obvious fixes.
+ */
+export async function tabDiagnostics(tabId: number): Promise<TabDiagnostics> {
+  const state = await getTabState(tabId);
+  const title = bestTitle(state);
+
+  return {
+    scriptRan: state.metaTop !== undefined || state.metaSub !== undefined,
+    sawVideo: state.sawVideo === true,
+    embeddedOrigins: state.embeddedOrigins ?? [],
+    bestTitle: title?.title ?? null,
+    urlIds: (state.urlIds ?? []).map((id) => `${id.source}:${id.id}`),
+    hasOpenSession: state.sessionId !== undefined,
+  };
 }
 
 /** Close out any session still open for a tab that's gone. */
