@@ -1,6 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import { getSettings, saveSettings, type Settings } from '@/lib/settings';
 import { db } from '@/lib/db';
+import { clearTitleIndex, saveTitleIndex, titleIndexStatus } from '@/lib/titleIndex';
+import {
+  availabilityStatus,
+  clearAvailabilityIndex,
+  saveAvailabilityIndex,
+  type AvailabilityIndex,
+} from '@/lib/providers';
 import './App.css';
 
 const REGIONS = ['IN', 'US', 'GB', 'CA', 'AU', 'DE', 'FR', 'JP', 'BR', 'SG'];
@@ -9,6 +16,9 @@ function App() {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [saved, setSaved] = useState(false);
   const [counts, setCounts] = useState({ movies: 0, sessions: 0, pending: 0 });
+  const [titleIndex, setTitleIndex] = useState({ loaded: false, titles: 0 });
+  const [availability, setAvailability] = useState({ loaded: false, titles: 0, region: '' });
+  const [indexError, setIndexError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     setSettings(await getSettings());
@@ -17,7 +27,28 @@ function App() {
       sessions: await db.sessions.count(),
       pending: await db.pending.count(),
     });
+    setTitleIndex(await titleIndexStatus());
+    setAvailability(await availabilityStatus());
   }, []);
+
+  const loadIndexFile = async (file: File, kind: 'titles' | 'availability') => {
+    setIndexError(null);
+    try {
+      const parsed = JSON.parse(await file.text());
+
+      if (kind === 'titles') {
+        if (!Array.isArray(parsed.entries)) throw new Error('Not a title index file.');
+        await saveTitleIndex(parsed);
+      } else {
+        const index = parsed as AvailabilityIndex;
+        if (!index.region || !index.titles) throw new Error('Not an availability file.');
+        await saveAvailabilityIndex(index);
+      }
+      await refresh();
+    } catch (error) {
+      setIndexError((error as Error).message);
+    }
+  };
 
   useEffect(() => {
     void refresh();
@@ -115,6 +146,86 @@ function App() {
             ))}
           </select>
         </label>
+      </section>
+
+      <section>
+        <h2>Offline indexes</h2>
+        <p className="note">
+          Prepared data files that let Keeper work without asking TMDB anything.
+          Build them with the scripts in <code>pipeline/</code>, then load them
+          here. They contain no personal data and are the same for everyone in a
+          region.
+        </p>
+
+        <div className="index-row">
+          <div>
+            <strong>Title index</strong>
+            <em>
+              {titleIndex.loaded
+                ? `${titleIndex.titles.toLocaleString()} titles — most films resolve without the network`
+                : 'Not loaded. Titles are resolved online instead.'}
+            </em>
+          </div>
+          <div className="index-actions">
+            <label className="file">
+              Load
+              <input
+                type="file"
+                accept="application/json"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) void loadIndexFile(file, 'titles');
+                }}
+              />
+            </label>
+            {titleIndex.loaded && (
+              <button
+                onClick={async () => {
+                  await clearTitleIndex();
+                  await refresh();
+                }}
+              >
+                Remove
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="index-row">
+          <div>
+            <strong>Availability ({settings.region})</strong>
+            <em>
+              {availability.loaded
+                ? `${availability.titles.toLocaleString()} titles mapped to services`
+                : 'Not loaded. Keeper cannot say where something is streaming.'}
+            </em>
+          </div>
+          <div className="index-actions">
+            <label className="file">
+              Load
+              <input
+                type="file"
+                accept="application/json"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) void loadIndexFile(file, 'availability');
+                }}
+              />
+            </label>
+            {availability.loaded && (
+              <button
+                onClick={async () => {
+                  await clearAvailabilityIndex(availability.region);
+                  await refresh();
+                }}
+              >
+                Remove
+              </button>
+            )}
+          </div>
+        </div>
+
+        {indexError && <p className="error">{indexError}</p>}
       </section>
 
       <section>

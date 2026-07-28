@@ -2,10 +2,11 @@ import { useCallback, useEffect, useState } from 'react';
 import { db } from '@/lib/db';
 import ConfirmQueue from './views/ConfirmQueue';
 import Library from './views/Library';
+import Watchlist from './views/Watchlist';
 import Sites from './views/Sites';
 import './App.css';
 
-type Tab = 'queue' | 'library' | 'sites';
+type Tab = 'queue' | 'watchlist' | 'library' | 'sites';
 
 function App() {
   const [tab, setTab] = useState<Tab>('sites');
@@ -46,8 +47,11 @@ function App() {
           Confirm
           {pendingCount > 0 && <span className="count">{pendingCount}</span>}
         </button>
+        <button className={tab === 'watchlist' ? 'on' : ''} onClick={() => setTab('watchlist')}>
+          Watchlist
+        </button>
         <button className={tab === 'library' ? 'on' : ''} onClick={() => setTab('library')}>
-          Library
+          Watched
         </button>
         <button className={tab === 'sites' ? 'on' : ''} onClick={() => setTab('sites')}>
           Sites
@@ -55,6 +59,7 @@ function App() {
       </nav>
 
       {tab === 'queue' && <ConfirmQueue key={version} onChange={bump} />}
+      {tab === 'watchlist' && <Watchlist key={version} />}
       {tab === 'library' && <Library key={version} />}
       {tab === 'sites' && <Sites onChange={bump} />}
 

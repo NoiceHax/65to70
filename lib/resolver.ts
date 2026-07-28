@@ -2,6 +2,7 @@ import { db } from './db';
 import { getSettings } from './settings';
 import { findByImdbId, search, verifyId, TmdbError, type TmdbTitle } from './tmdb';
 import { isDecisive, rankMatches, type ScoredCandidate } from './match';
+import { lookupLocal } from './titleIndex';
 import { titleKey, type MediaType, type Movie, type PendingDetection, type Source } from './types';
 
 /**
@@ -136,17 +137,14 @@ export async function resolvePending(pendingId: number): Promise<ResolveOutcome>
     ? Math.round(session.durationSec / 60)
     : undefined;
 
-  if (!settings.tmdbApiKey) {
-    return {
-      status: 'offline',
-      candidates: [],
-      message: 'Add a TMDB API key in options to identify titles.',
-    };
-  }
-
   try {
-    // 1. Ids from the URL settle it outright when they verify.
-    const byId = await resolveByUrlIds(pending, settings.tmdbApiKey, settings.language);
+    // 1. Ids from the URL settle it outright when they verify. Verification
+    //    needs the network, so this step is skipped without a key rather than
+    //    aborting — the local index below works without one.
+    const byId = settings.tmdbApiKey
+      ? await resolveByUrlIds(pending, settings.tmdbApiKey, settings.language)
+      : null;
+
     if (byId) {
       const movie = await upsertMovie(byId, source);
       await db.pending.update(pendingId, {
@@ -163,15 +161,61 @@ export async function resolvePending(pendingId: number): Promise<ResolveOutcome>
       return { status: 'resolved', movie, candidates: [{ candidate: byId, score: 1 }] };
     }
 
-    // 2. Title search, only with explicit consent.
     if (!pending.cleanedTitle) {
       return { status: 'unresolved', candidates: [], message: 'No title could be read.' };
     }
-    if (!settings.allowNetworkResolve) {
+
+    const matchInput = {
+      title: pending.cleanedTitle,
+      year: pending.year,
+      runtimeMinutes,
+    };
+
+    // 2. The local index, which needs no network at all. This is what keeps
+    //    the common case off the wire.
+    const local = await lookupLocal(pending.cleanedTitle);
+    if (local.length > 0) {
+      const localRanked = rankMatches(matchInput, local);
+      if (isDecisive(localRanked)) {
+        const movie = await upsertMovie(localRanked[0].candidate, source);
+        await db.pending.update(pendingId, {
+          candidates: localRanked.slice(0, 5).map(({ candidate, score }) => ({
+            tmdbId: candidate.tmdbId,
+            mediaType: candidate.mediaType,
+            title: candidate.title,
+            year: candidate.year,
+            score,
+          })),
+        });
+        return { status: 'resolved', movie, candidates: localRanked };
+      }
+    }
+
+    // 3. Title search — needs both a key and explicit consent. Falling short of
+    //    either isn't an error: whatever the local index turned up is still
+    //    offered as candidates for the user to pick from.
+    const localOnly = rankMatches(matchInput, local);
+
+    if (!settings.tmdbApiKey || !settings.allowNetworkResolve) {
+      if (localOnly.length > 0) {
+        await db.pending.update(pendingId, {
+          candidates: localOnly.slice(0, 5).map(({ candidate, score }) => ({
+            tmdbId: candidate.tmdbId,
+            mediaType: candidate.mediaType,
+            title: candidate.title,
+            year: candidate.year,
+            score,
+          })),
+        });
+        return { status: 'ambiguous', candidates: localOnly };
+      }
+
       return {
         status: 'offline',
         candidates: [],
-        message: 'Title lookup is off. Enable it in options, or pick the title yourself.',
+        message: settings.tmdbApiKey
+          ? 'Title lookup is off. Enable it in options, or pick the title yourself.'
+          : 'Add a TMDB API key in options, or load a title index, to identify titles.',
       };
     }
 
@@ -182,10 +226,9 @@ export async function resolvePending(pendingId: number): Promise<ResolveOutcome>
       { apiKey: settings.tmdbApiKey, language: settings.language },
     );
 
-    const ranked = rankMatches(
-      { title: pending.cleanedTitle, year: pending.year, runtimeMinutes },
-      results,
-    );
+    // Score network results alongside anything the local index offered, so a
+    // near-miss locally isn't discarded just because the network was consulted.
+    const ranked = rankMatches(matchInput, [...local, ...results]);
 
     await db.pending.update(pendingId, {
       candidates: ranked.slice(0, 5).map(({ candidate, score }) => ({

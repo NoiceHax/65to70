@@ -61,8 +61,9 @@ nav {
 nav button {
   display: flex;
   align-items: center;
-  gap: 5px;
-  padding: 5px 10px;
+  gap: 4px;
+  padding: 5px 8px;
+  font-size: 12.5px;
   border: 0;
   border-radius: 6px;
   background: transparent;
@@ -266,6 +267,22 @@ ul {
 .meta {
   font-size: 11.5px;
   color: var(--muted);
+}
+
+.watch-row {
+  align-items: flex-start;
+}
+
+.watch-main {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.where {
+  font-size: 11.5px;
+  color: var(--accent);
 }
 
 /* Sites ----------------------------------------------------------------- */

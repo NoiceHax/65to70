@@ -121,6 +121,58 @@ button:hover {
   border-color: var(--accent);
 }
 
+.index-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.index-row em {
+  display: block;
+  margin-top: 2px;
+  font-style: normal;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.index-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 6px;
+}
+
+.file {
+  padding: 8px 14px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--field);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.file:hover {
+  border-color: var(--accent);
+}
+
+.file input {
+  display: none;
+}
+
+code {
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: var(--field);
+  font-size: 12px;
+}
+
+.error {
+  margin: 10px 0 0;
+  color: #e5484d;
+}
+
 .toast {
   position: fixed;
   right: 20px;
