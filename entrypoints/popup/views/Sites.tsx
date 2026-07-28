@@ -25,6 +25,8 @@ export default function Sites({ onChange }: { onChange: () => void }) {
   const [tabHost, setTabHost] = useState<string | null>(null);
   const [diagnostics, setDiagnostics] = useState<TabDiagnostics | null>(null);
   const [allSites, setAllSites] = useState(false);
+  const [report, setReport] = useState<string | null>(null);
+  const [inspecting, setInspecting] = useState(false);
 
   const refresh = useCallback(async () => {
     setOrigins(await grantedOrigins());
@@ -215,6 +217,46 @@ export default function Sites({ onChange }: { onChange: () => void }) {
           </li>
         ))}
       </ul>
+
+      {/* For sites the generic cascade can't read — an SPA that never changes
+          its URL, or one that fights devtools. Reports what every frame
+          contains so a selector can be found without a panel open. */}
+      <h2 className="spaced">Stuck on a site?</h2>
+      <p className="note">
+        Inspect what this page exposes. Useful when nothing is detected and you
+        want to know why.
+      </p>
+
+      <button
+        onClick={async () => {
+          const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
+          if (tab?.id === undefined) return;
+
+          setInspecting(true);
+          const response = (await browser.runtime.sendMessage({
+            type: 'diagnose-page',
+            tabId: tab.id,
+          })) as { report: string } | undefined;
+
+          setInspecting(false);
+          setReport(response?.report ?? 'No response.');
+        }}
+        disabled={inspecting}
+      >
+        {inspecting ? 'Inspecting…' : 'Inspect this page'}
+      </button>
+
+      {report && (
+        <>
+          <pre className="report">{report}</pre>
+          <button
+            className="link"
+            onClick={() => void navigator.clipboard.writeText(report)}
+          >
+            Copy
+          </button>
+        </>
+      )}
 
       <button className="link" onClick={() => void browser.runtime.openOptionsPage()}>
         Settings and data export

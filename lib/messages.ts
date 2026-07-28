@@ -163,7 +163,24 @@ export interface WatchlistAddMessage {
   year?: number;
 }
 
+/**
+ * Ask what a page actually contains.
+ *
+ * For sites that resist inspection, or simply don't reveal enough for the
+ * generic cascade to work. Runs in every frame and reports back, so a selector
+ * can be found without opening a devtools panel the page may be watching for.
+ */
+export interface DiagnosePageMessage {
+  type: 'diagnose-page';
+  tabId: number;
+}
+
+export interface DiagnosePageResponse {
+  report: string;
+}
+
 export type KeeperMessage =
+  | DiagnosePageMessage
   | PageMetaMessage
   | MediaProgressMessage
   | LibraryRequest

@@ -7,6 +7,7 @@ import { addFromSearch, offerFromSearch } from '@/lib/searchIntent';
 import { confirmCandidate, dismissPending } from '@/lib/resolver';
 import { refreshBadge } from '@/lib/badge';
 import { loadBundledIndexes } from '@/lib/bundledIndexes';
+import { collectFrameReport, formatReports, type FrameReport } from '@/lib/diagnose';
 import type { KeeperMessage } from '@/lib/messages';
 
 export default defineBackground(() => {
@@ -39,6 +40,30 @@ export default defineBackground(() => {
     // channel open for the async reply.
     if (msg.type === 'library-request') {
       void librarySnapshot().then((entries) => sendResponse({ entries }));
+      return true;
+    }
+
+    /*
+     * Run the collector in every frame at once.
+     *
+     * scripting.executeScript with allFrames returns one result per frame,
+     * which is what makes this workable on sites that put the player in an
+     * embed — the frame holding the video reports alongside its parent, and
+     * neither needs a devtools panel open to be inspected.
+     */
+    if (msg.type === 'diagnose-page') {
+      void browser.scripting
+        .executeScript({
+          target: { tabId: msg.tabId, allFrames: true },
+          func: collectFrameReport,
+        })
+        .then((results) => {
+          const reports = results.map((r) => r.result).filter(Boolean) as FrameReport[];
+          sendResponse({ report: formatReports(reports) || 'No frames responded.' });
+        })
+        .catch((error: Error) => {
+          sendResponse({ report: `Could not inspect this page: ${error.message}` });
+        });
       return true;
     }
 
