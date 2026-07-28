@@ -1,6 +1,7 @@
 import { browser } from 'wxt/browser';
 import { extractPageMeta } from '@/lib/pageMeta';
 import { readAdapterMeta } from '@/lib/adapters';
+import { PLAYER_URL } from '@/lib/frames';
 import { extractUrlIds } from '@/lib/urlIds';
 import { bucketIndex, bucketsCovered, effectiveDuration } from '@/lib/progress';
 import { showToast } from '@/lib/toast';
@@ -250,9 +251,6 @@ function scanForMedia(): void {
  * the extracted values catches the late update instead; re-sending is harmless
  * because the background merges by tab.
  */
-/** URL shapes that identify a video embed rather than an advert. */
-const PLAYER_URL = /player|embed|stream|video|watch|vidsrc|videasy|megacloud|filemoon/i;
-
 /**
  * Cross-origin iframes on this page.
  *

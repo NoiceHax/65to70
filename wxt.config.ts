@@ -1,12 +1,25 @@
+import { resolve } from 'node:path';
 import { defineConfig } from 'wxt';
 
 // See https://wxt.dev/api/config.html
 export default defineConfig({
   modules: ['@wxt-dev/module-react'],
-  // Opens a DevTools Protocol port so `npm run logs` can stream the service
-  // worker and content-script consoles into a terminal.
   webExt: {
+    // Opens a DevTools Protocol port so `npm run logs` can stream the service
+    // worker and content-script consoles into a terminal.
     chromiumArgs: ['--remote-debugging-port=9222'],
+
+    /*
+     * A persistent profile, kept between runs.
+     *
+     * By default web-ext launches a throwaway profile, which wipes every host
+     * permission on restart. Since Keeper asks for nothing at install and is
+     * inert until sites are granted, that meant every dev restart began with
+     * an extension that could not do anything — and a log that looked like a
+     * permissions bug rather than a fresh profile.
+     */
+    chromiumProfile: resolve('.wxt/chrome-profile'),
+    keepProfileChanges: true,
   },
   manifest: {
     name: 'Keeper',
@@ -21,6 +34,10 @@ export default defineConfig({
       'tabs',
       // Weekly refresh of the prepared title/availability indexes.
       'alarms',
+      // Reading where each frame in a tab actually is, after redirects. Embed
+      // hosts redirect, so an iframe's src attribute names the wrong origin to
+      // grant. This reads frame URLs only — never their contents.
+      'webNavigation',
     ],
     // Deliberately empty. Host access is granted per-site by the user at
     // runtime; nothing is requested at install. See lib/permissions.ts.

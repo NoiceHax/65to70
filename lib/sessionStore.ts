@@ -3,6 +3,7 @@ import { coverageRatio, db, emptyCoverage, isComplete } from './db';
 import { cleanTitle, isUsableTitle, type CleanedTitle } from './titleClean';
 import { rankCandidates, type PageMetaResult } from './pageMeta';
 import { refreshBadge } from './badge';
+import { liveFramesForTab } from './frames';
 import type { UrlIdCandidate } from './urlIds';
 import type {
   ConfirmPromptMessage,
@@ -342,10 +343,25 @@ export async function tabDiagnostics(tabId: number): Promise<TabDiagnostics> {
   const state = await getTabState(tabId);
   const title = bestTitle(state);
 
+  // Where the frames actually are now takes priority over what the markup
+  // said. Embed hosts redirect, and a src attribute names the origin the
+  // player has already left — granting that one changes nothing.
+  const live = await liveFramesForTab(tabId);
+  const merged = new Map(
+    (state.embeddedFrames ?? []).map((frame) => [frame.origin, frame]),
+  );
+  for (const frame of live) {
+    const existing = merged.get(frame.origin);
+    merged.set(frame.origin, {
+      origin: frame.origin,
+      likelyPlayer: (existing?.likelyPlayer ?? false) || frame.likelyPlayer,
+    });
+  }
+
   return {
     scriptRan: state.metaTop !== undefined || state.metaSub !== undefined,
     sawVideo: state.sawVideo === true,
-    embeddedFrames: state.embeddedFrames ?? [],
+    embeddedFrames: [...merged.values()],
     bestTitle: title?.title ?? null,
     urlIds: (state.urlIds ?? []).map((id) => `${id.source}:${id.id}`),
     hasOpenSession: state.sessionId !== undefined,
