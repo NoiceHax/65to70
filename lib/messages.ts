@@ -28,7 +28,7 @@ export interface PageMetaMessage {
   hasVideo: boolean;
 
   /**
-   * Origins of cross-origin iframes on the page.
+   * Cross-origin iframes on the page.
    *
    * Streaming sites routinely serve the player from a separate domain. Host
    * permissions are per-origin and `allFrames` only injects into frames whose
@@ -37,7 +37,20 @@ export interface PageMetaMessage {
    * lets the popup offer the missing grant instead of silently recording
    * nothing.
    */
-  embeddedOrigins: string[];
+  embeddedFrames: EmbeddedFrame[];
+}
+
+export interface EmbeddedFrame {
+  origin: string;
+  /**
+   * Whether this looks like the video player rather than an advert.
+   *
+   * These pages are dense with ad frames, and asking someone to grant an
+   * extension access to an unidentified ad network is a bad thing to put in
+   * front of them. Size and URL shape separate a player from a banner well
+   * enough to make the distinction, and the UI defers to it.
+   */
+  likelyPlayer: boolean;
 }
 
 export interface MediaProgressMessage {

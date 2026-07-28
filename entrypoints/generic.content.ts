@@ -178,9 +178,9 @@ let lastReported = '';
 function reportState(): void {
   const all = document.querySelectorAll('video').length;
   const usable = Array.from(document.querySelectorAll('video')).filter(usableDuration).length;
-  const frames = embeddedOrigins();
+  const frames = embeddedFrames();
 
-  const state = `${all}:${usable}:${frames.join(',')}:${media ? 'attached' : 'none'}`;
+  const state = `${all}:${usable}:${frames.map((f) => f.origin).join(',')}:${media ? 'attached' : 'none'}`;
   if (state === lastReported) return;
   lastReported = state;
 
@@ -210,11 +210,18 @@ function reportState(): void {
 
   if (all === 0 && frames.length > 0) {
     // The single most common reason nothing gets recorded: the player lives in
-    // a frame this extension has no permission to touch.
+    // a frame this extension has no permission to touch. Players are named
+    // separately from ad frames — these pages carry plenty of both, and only
+    // one of them is worth granting anything to.
+    const players = frames.filter((f) => f.likelyPlayer).map((f) => f.origin);
+    const others = frames.filter((f) => !f.likelyPlayer).map((f) => f.origin);
+
     console.warn(
-      `[keeper] ${location.hostname}: no video here, but the page embeds`,
-      frames.join(', '),
-      '— grant that origin in the popup or the player stays invisible',
+      `[keeper] ${location.hostname}: no video here.`,
+      players.length > 0
+        ? `Player looks like ${players.join(', ')} — grant it in the popup.`
+        : 'No player-shaped frame found.',
+      others.length > 0 ? `(also embedded, probably ads: ${others.join(', ')})` : '',
     );
     return;
   }
@@ -243,33 +250,47 @@ function scanForMedia(): void {
  * the extracted values catches the late update instead; re-sending is harmless
  * because the background merges by tab.
  */
+/** URL shapes that identify a video embed rather than an advert. */
+const PLAYER_URL = /player|embed|stream|video|watch|vidsrc|videasy|megacloud|filemoon/i;
+
 /**
- * Origins of cross-origin iframes on this page.
+ * Cross-origin iframes on this page.
  *
  * Reading an iframe's `src` attribute is just a DOM read — it needs no access
  * to the frame's contents, so this works even though the frame itself is off
- * limits. That's what makes it possible to tell the user which origin is
- * missing rather than leaving them with a site that records nothing.
+ * limits. That's what makes it possible to name the origin that's missing
+ * rather than leaving a site that records nothing and explains nothing.
+ *
+ * Runs in every frame, not only the top one. These sites chain their embeds —
+ * the page loads a player host, which loads the actual stream host — so
+ * reporting only from the top frame stops one link short of the video.
  */
-function embeddedOrigins(): string[] {
-  if (!isTopFrame) return [];
+function embeddedFrames(): { origin: string; likelyPlayer: boolean }[] {
+  const found = new Map<string, boolean>();
 
-  const origins = new Set<string>();
   for (const frame of Array.from(document.querySelectorAll('iframe'))) {
     const src = frame.getAttribute('src');
     if (!src) continue;
 
     try {
-      const { origin, protocol } = new URL(src, location.href);
+      const { origin, protocol, href } = new URL(src, location.href);
       if (protocol !== 'http:' && protocol !== 'https:') continue;
       if (origin === location.origin) continue;
-      origins.add(origin);
+
+      // A player is big. Standard ad units are 300x250 or 728x90, so requiring
+      // both a wide and a tall box excludes them without excluding a real
+      // embed, and a player-shaped URL vouches for frames not yet laid out.
+      const rect = frame.getBoundingClientRect();
+      const bigEnough = rect.width >= 480 && rect.height >= 270;
+      const likelyPlayer = PLAYER_URL.test(href) || bigEnough;
+
+      found.set(origin, (found.get(origin) ?? false) || likelyPlayer);
     } catch {
       // Relative or malformed src; nothing to grant.
     }
   }
 
-  return [...origins];
+  return [...found].map(([origin, likelyPlayer]) => ({ origin, likelyPlayer }));
 }
 
 function reportPageMeta(): void {
@@ -287,7 +308,7 @@ function reportPageMeta(): void {
   ];
 
   const urlIds = extractUrlIds(location.href);
-  const embedded = embeddedOrigins();
+  const embedded = embeddedFrames();
   const hasVideo = pickVideo() !== null;
 
   // Still report when nothing was identifiable: knowing a page had a player in
@@ -312,7 +333,7 @@ function reportPageMeta(): void {
     hostname: location.hostname,
     isTopFrame,
     hasVideo,
-    embeddedOrigins: embedded,
+    embeddedFrames: embedded,
   });
 }
 

@@ -132,11 +132,21 @@ async function poll(): Promise<void> {
   }
 
   for (const target of targets) {
-    // Service workers for the extension, plus any http(s) page — content
-    // scripts log into the page's context, not the worker's.
-    const isWorker = target.type === 'service_worker' && target.url.startsWith('chrome-extension://');
-    const isPage = target.type === 'page' && /^https?:/.test(target.url);
-    if (isWorker || isPage) attach(target);
+    const isWorker =
+      target.type === 'service_worker' && target.url.startsWith('chrome-extension://');
+
+    /*
+     * Not just `page`. Under site isolation a cross-origin iframe runs in its
+     * own process and shows up as a separate target of type `iframe`, so a
+     * content script inside an embedded player logs somewhere `page` never
+     * covers. Missing those made an injected script look like one that had
+     * never run — the opposite conclusion.
+     */
+    const isFrame =
+      ['page', 'iframe', 'webview', 'other'].includes(target.type) &&
+      /^https?:/.test(target.url);
+
+    if (isWorker || isFrame) attach(target);
   }
 }
 

@@ -6,6 +6,7 @@ import { refreshBadge } from './badge';
 import type { UrlIdCandidate } from './urlIds';
 import type {
   ConfirmPromptMessage,
+  EmbeddedFrame,
   MediaProgressMessage,
   PageMetaMessage,
 } from './messages';
@@ -41,7 +42,7 @@ interface TabState {
   urlIds?: UrlIdCandidate[];
 
   /** Cross-origin iframe origins seen on the page, for the diagnostics panel. */
-  embeddedOrigins?: string[];
+  embeddedFrames?: EmbeddedFrame[];
   /** Whether any injected frame reported a usable media element. */
   sawVideo?: boolean;
   lastSeenUrl?: string;
@@ -97,7 +98,7 @@ export async function handlePageMeta(tabId: number, msg: PageMetaMessage): Promi
   // A new page means the previous diagnosis no longer applies.
   if (msg.isTopFrame && state.lastSeenUrl !== undefined && state.lastSeenUrl !== msg.url) {
     state.sawVideo = false;
-    state.embeddedOrigins = undefined;
+    state.embeddedFrames = undefined;
   }
 
   // Any frame finding a video is enough; they report independently.
@@ -107,12 +108,30 @@ export async function handlePageMeta(tabId: number, msg: PageMetaMessage): Promi
     state.metaTop = msg.candidates;
     state.url = msg.url;
     state.hostname = msg.hostname;
-    state.embeddedOrigins = msg.embeddedOrigins;
+    state.embeddedFrames = msg.embeddedFrames;
     state.lastSeenUrl = msg.url;
     if (msg.urlIds.length > 0) state.urlIds = msg.urlIds;
   } else {
     state.metaSub = msg.candidates;
     state.hostname ??= msg.hostname;
+
+    // Merge rather than replace. These sites chain their embeds — the page
+    // loads a player host, which loads the actual stream host — so the next
+    // origin to grant is often only visible from inside the frame that was
+    // just granted. Keeping both means the chain can be followed one link at
+    // a time instead of dead-ending.
+    const merged = new Map(
+      (state.embeddedFrames ?? []).map((frame) => [frame.origin, frame]),
+    );
+    for (const frame of msg.embeddedFrames) {
+      const existing = merged.get(frame.origin);
+      merged.set(frame.origin, {
+        origin: frame.origin,
+        likelyPlayer: (existing?.likelyPlayer ?? false) || frame.likelyPlayer,
+      });
+    }
+    state.embeddedFrames = [...merged.values()];
+
     // A subframe's URL is the embed URL, which often carries the id even when
     // the parent page's URL does not.
     if (msg.urlIds.length > 0 && (state.urlIds ?? []).length === 0) {
@@ -305,7 +324,7 @@ export interface TabDiagnostics {
   scriptRan: boolean;
   sawVideo: boolean;
   /** Cross-origin iframe origins the page loads. */
-  embeddedOrigins: string[];
+  embeddedFrames: EmbeddedFrame[];
   bestTitle: string | null;
   urlIds: string[];
   hasOpenSession: boolean;
@@ -326,7 +345,7 @@ export async function tabDiagnostics(tabId: number): Promise<TabDiagnostics> {
   return {
     scriptRan: state.metaTop !== undefined || state.metaSub !== undefined,
     sawVideo: state.sawVideo === true,
-    embeddedOrigins: state.embeddedOrigins ?? [],
+    embeddedFrames: state.embeddedFrames ?? [],
     bestTitle: title?.title ?? null,
     urlIds: (state.urlIds ?? []).map((id) => `${id.source}:${id.id}`),
     hasOpenSession: state.sessionId !== undefined,

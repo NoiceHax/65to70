@@ -92,25 +92,48 @@ export default function Sites({ onChange }: { onChange: () => void }) {
           )}
 
           {!diagnostics.sawVideo &&
-            diagnostics.embeddedOrigins.filter((o) => !isGranted(`${o}/*`)).length > 0 && (
-              <>
-                <p className="note">
-                  The player is served from another domain. Permissions are
-                  per-origin, so allowing this site doesn&apos;t reach it:
-                </p>
-                {diagnostics.embeddedOrigins
-                  .filter((o) => !isGranted(`${o}/*`))
-                  .map((origin) => (
-                    <button
-                      key={origin}
-                      className="primary"
-                      onClick={() => void toggle(`${origin}/*`)}
-                    >
-                      Allow {new URL(origin).hostname}
-                    </button>
-                  ))}
-              </>
-            )}
+            (() => {
+              const ungranted = diagnostics.embeddedFrames.filter(
+                (frame) => !isGranted(`${frame.origin}/*`),
+              );
+              const players = ungranted.filter((frame) => frame.likelyPlayer);
+              const others = ungranted.filter((frame) => !frame.likelyPlayer);
+              if (ungranted.length === 0) return null;
+
+              return (
+                <>
+                  {players.length > 0 && (
+                    <>
+                      <p className="note">
+                        The player is served from another domain. Permissions
+                        are per-origin, so allowing this site doesn&apos;t reach
+                        it:
+                      </p>
+                      {players.map((frame) => (
+                        <button
+                          key={frame.origin}
+                          className="primary"
+                          onClick={() => void toggle(`${frame.origin}/*`)}
+                        >
+                          Allow {new URL(frame.origin).hostname}
+                        </button>
+                      ))}
+                    </>
+                  )}
+
+                  {/* Listed, but not offered as a button. These pages are full
+                      of ad frames and prompting someone to hand an extension
+                      access to an unidentified ad network is not something to
+                      put in front of them. */}
+                  {others.length > 0 && (
+                    <p className="note dim">
+                      Also embedded, probably adverts — not needed for tracking:{' '}
+                      {others.map((f) => new URL(f.origin).hostname).join(', ')}
+                    </p>
+                  )}
+                </>
+              );
+            })()}
         </div>
       )}
 
