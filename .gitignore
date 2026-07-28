@@ -9,6 +9,10 @@ lerna-debug.log*
 
 node_modules
 .output
+
+# Generated indexes. Large, rebuildable, and regenerated weekly — they belong
+# in the options page, not in history.
+pipeline/out
 stats.html
 stats-*.json
 .wxt
