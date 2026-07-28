@@ -2,7 +2,7 @@ import { db } from './db';
 import { getSettings } from './settings';
 import { findByImdbId, search, verifyId, TmdbError, type TmdbTitle } from './tmdb';
 import { isDecisive, rankMatches, type ScoredCandidate } from './match';
-import { lookupLocal } from './titleIndex';
+import { lookupLocal, lookupLocalById } from './titleIndex';
 import { titleKey, type MediaType, type Movie, type PendingDetection, type Source } from './types';
 
 /**
@@ -331,13 +331,45 @@ export async function confirmCandidate(
   options: ConfirmOptions = {},
 ): Promise<Movie | null> {
   const settings = await getSettings();
-  if (!settings.tmdbApiKey) return null;
 
-  const { getById } = await import('./tmdb');
-  const found = await getById(tmdbId, mediaType, {
-    apiKey: settings.tmdbApiKey,
-    language: settings.language,
-  });
+  /*
+   * Details, without requiring a key.
+   *
+   * Everything else had been made to work offline, but confirming still called
+   * TMDB — so the bundled index would resolve a title and then refuse to record
+   * it, for want of a key nobody should have needed. The network path is now
+   * an enrichment, not a requirement.
+   */
+  let found = await lookupLocalById(tmdbId);
+
+  if (settings.tmdbApiKey) {
+    try {
+      const { getById } = await import('./tmdb');
+      const detailed = await getById(tmdbId, mediaType, {
+        apiKey: settings.tmdbApiKey,
+        language: settings.language,
+      });
+      if (detailed) found = detailed;
+    } catch {
+      // Network trouble must not lose a confirmation the user just made.
+    }
+  }
+
+  // Last resort: the candidate the queue was displaying. It carries enough to
+  // record the title, just without runtime or an IMDb id.
+  if (!found) {
+    const pendingRow = await db.pending.get(pendingId);
+    const candidate = pendingRow?.candidates.find((c) => c.tmdbId === tmdbId);
+    if (candidate) {
+      found = {
+        tmdbId: candidate.tmdbId,
+        mediaType: candidate.mediaType,
+        title: candidate.title,
+        year: candidate.year,
+      };
+    }
+  }
+
   if (!found) return null;
 
   const movie = await confirmPending(pendingId, found);

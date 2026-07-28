@@ -56,6 +56,7 @@ export async function saveTitleIndex(stored: StoredIndex): Promise<number> {
   await db.meta.put({ key: META_KEY, value: stored });
   lookup = build(stored);
   loadedAt = stored.generatedAt;
+  byId = null; // Rebuilt lazily against the new data.
   return stored.entries.length;
 }
 
@@ -63,6 +64,7 @@ export async function clearTitleIndex(): Promise<void> {
   await db.meta.delete(META_KEY);
   lookup = null;
   loadedAt = null;
+  byId = null;
 }
 
 async function ensureLoaded(): Promise<Map<string, IndexEntry[]> | null> {
@@ -120,4 +122,28 @@ export async function lookupLocal(title: string): Promise<TmdbTitle[]> {
 
 export function indexGeneratedAt(): string | null {
   return loadedAt;
+}
+
+/** Built alongside the title map, so lookups by id cost nothing extra. */
+let byId: Map<number, IndexEntry> | null = null;
+
+/**
+ * Look a title up by its TMDB id.
+ *
+ * Needed so confirming a detection works with no API key. Everything else had
+ * been made to run offline, but confirming still called TMDB for details —
+ * which meant the bundled index resolved a title and then refused to record
+ * it, for want of a key nobody should have needed.
+ */
+export async function lookupLocalById(tmdbId: number): Promise<TmdbTitle | null> {
+  if (!byId) {
+    const entry = await db.meta.get(META_KEY);
+    if (!entry) return null;
+
+    const stored = entry.value as StoredIndex;
+    byId = new Map(stored.entries.map((item) => [item.i, item]));
+  }
+
+  const found = byId.get(tmdbId);
+  return found ? toTmdbTitle(found) : null;
 }
