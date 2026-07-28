@@ -12,7 +12,7 @@ import { titleKey, type MediaType, type Movie, type PendingDetection, type Sourc
  * Order matters and is not negotiable:
  *
  *   1. Already-known titles, from the local database.
- *   2. Catalogue ids lifted from the URL — exact, no guessing involved.
+ *   2. Catalogue ids lifted from the URL - exact, no guessing involved.
  *   3. Title search, and only if the user opted into network resolution.
  *
  * Anything that survives with a decisive score is attached to the pending
@@ -54,7 +54,7 @@ function toMovie(found: TmdbTitle, source: Source): Movie {
  * Insert or merge a title.
  *
  * Merging rather than overwriting protects everything the user has invested in
- * a record — ratings, notes, collection membership — when a title is detected
+ * a record - ratings, notes, collection membership - when a title is detected
  * again months later. Provenance accumulates rather than being replaced.
  */
 export async function upsertMovie(found: TmdbTitle, source: Source): Promise<Movie> {
@@ -141,7 +141,7 @@ export async function resolvePending(pendingId: number): Promise<ResolveOutcome>
   try {
     // 1. Ids from the URL settle it outright when they verify. Verification
     //    needs the network, so this step is skipped without a key rather than
-    //    aborting — the local index below works without one.
+    //    aborting - the local index below works without one.
     const byId = settings.tmdbApiKey
       ? await resolveByUrlIds(pending, settings.tmdbApiKey, settings.language)
       : null;
@@ -192,7 +192,7 @@ export async function resolvePending(pendingId: number): Promise<ResolveOutcome>
       }
     }
 
-    // 3. Title search — needs both a key and explicit consent. Falling short of
+    // 3. Title search - needs both a key and explicit consent. Falling short of
     //    either isn't an error: whatever the local index turned up is still
     //    offered as candidates for the user to pick from.
     const localOnly = rankMatches(matchInput, local);
@@ -296,7 +296,7 @@ export async function confirmPending(
  *
  * The escape hatch that makes the confirm queue honest: an automatic matcher
  * will always have cases it can't reach, and the answer to those is to let the
- * user say what it was — not to guess harder.
+ * user say what it was - not to guess harder.
  */
 export async function searchManually(
   query: string,
@@ -313,7 +313,7 @@ export async function searchManually(
 
 export interface ConfirmOptions {
   liked?: boolean;
-  /** 0.5–5.0 in half steps, or null to leave unrated — which is the norm. */
+  /** 0.5-5.0 in half steps, or null to leave unrated - which is the norm. */
   rating?: number | null;
 }
 
@@ -321,7 +321,7 @@ export interface ConfirmOptions {
  * Confirm a detection against one of its candidates.
  *
  * Fetches full details first because the search results the queue displays are
- * summaries — runtime and IMDb id come from the detail endpoint, and both are
+ * summaries - runtime and IMDb id come from the detail endpoint, and both are
  * needed later for availability and for the Letterboxd export.
  */
 export async function confirmCandidate(
@@ -336,7 +336,7 @@ export async function confirmCandidate(
    * Details, without requiring a key.
    *
    * Everything else had been made to work offline, but confirming still called
-   * TMDB — so the bundled index would resolve a title and then refuse to record
+   * TMDB - so the bundled index would resolve a title and then refuse to record
    * it, for want of a key nobody should have needed. The network path is now
    * an enrichment, not a requirement.
    */
@@ -385,7 +385,7 @@ export async function confirmCandidate(
 }
 
 /**
- * Drop a detection without recording anything — "this wasn't me".
+ * Drop a detection without recording anything - "this wasn't me".
  *
  * Remembers the title for that host so it isn't offered again. Site chrome is
  * stable, so without this the same entry returns on every visit and dismissing

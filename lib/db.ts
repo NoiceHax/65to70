@@ -54,7 +54,7 @@ export function emptyCoverage(): Uint8Array {
   return new Uint8Array(COVERAGE_BUCKETS);
 }
 
-/** Fraction of buckets played, 0–1. */
+/** Fraction of buckets played, 0-1. */
 export function coverageRatio(coverage: Uint8Array): number {
   let covered = 0;
   for (let i = 0; i < coverage.length; i++) if (coverage[i]) covered++;
@@ -86,7 +86,7 @@ export function isComplete(coverage: Uint8Array): boolean {
 /**
  * Recompute `watched` and `rewatch` for a title from its sessions.
  *
- * `watched` is true when the *union* of session coverage clears the threshold —
+ * `watched` is true when the *union* of session coverage clears the threshold -
  * not when any single session does. `rewatch` counts individually-complete
  * sessions beyond the first, which is what Letterboxd's Rewatch column means.
  */
@@ -149,8 +149,8 @@ export async function recomputeWatchState(key: TitleKey): Promise<void> {
 /**
  * How much of a title has been seen, across every session for it.
  *
- * A single session is not the answer. Pages reload — ad layers on these sites
- * force it constantly — and each reload starts a fresh session, so a film
+ * A single session is not the answer. Pages reload - ad layers on these sites
+ * force it constantly - and each reload starts a fresh session, so a film
  * watched in three stretches has three partial bitmaps. Reporting only the
  * latest is how a finished film reads as a quarter watched.
  *
@@ -181,7 +181,7 @@ export async function titleProgress(key: TitleKey): Promise<number> {
  * Set progress by hand, overriding measurement.
  *
  * Also settles whether it counts as watched, since that is the reason anyone
- * reaches for this — a film finished that the bitmap disagrees about.
+ * reaches for this - a film finished that the bitmap disagrees about.
  */
 export async function setManualProgress(key: TitleKey, ratio: number): Promise<void> {
   const clamped = Math.max(0, Math.min(1, ratio));
@@ -213,7 +213,7 @@ export interface ActiveTracking {
 /**
  * What is being tracked right now.
  *
- * A session counts as live if it reported in recently — the content script
+ * A session counts as live if it reported in recently - the content script
  * flushes every fifteen seconds, so a minute and a half of silence means
  * playback stopped, the tab closed, or something broke. Erring long is
  * deliberate: showing a stale row briefly is better than a status that blinks
@@ -302,7 +302,7 @@ export async function watchedEpisodes(key: TitleKey): Promise<WatchedEpisode[]> 
 }
 
 /**
- * Titles with real progress but no complete session — "you stopped 42 minutes
+ * Titles with real progress but no complete session - "you stopped 42 minutes
  * in, 3 days ago". Works across every service at once because it reads our own
  * sessions rather than any provider's API.
  */

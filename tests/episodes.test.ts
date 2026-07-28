@@ -98,7 +98,7 @@ describe('series watch state', () => {
   });
 
   it('unions coverage within one episode across sittings', async () => {
-    // Half on Monday, half on Friday — same episode, so it counts once.
+    // Half on Monday, half on Friday - same episode, so it counts once.
     await db.movies.put(record('tv', 1399, 'Game of Thrones'));
     await db.sessions.bulkAdd([
       session(SHOW, 0, 44, { season: 1, episode: 1 }),

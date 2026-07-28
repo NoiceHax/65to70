@@ -4,7 +4,7 @@ import type { MediaType } from './types';
  * Pulling catalogue ids straight out of the URL.
  *
  * This tier didn't exist in the original design and it should have. A large
- * share of streaming sites — cineby, vidsrc, 2embed and the rest — key their
+ * share of streaming sites - cineby, vidsrc, 2embed and the rest - key their
  * pages on TMDB or IMDb ids rather than slugs, because they pull their
  * artwork and metadata from those same APIs:
  *
@@ -15,7 +15,7 @@ import type { MediaType } from './types';
  * When that's true the canonical id is sitting in plain sight, which beats
  * every text-based method: no cleaning, no fuzzy matching, no ambiguity between
  * remakes. It also rescues client-rendered sites whose markup carries no usable
- * title at all — which is exactly where Tier 2 was failing.
+ * title at all - which is exactly where Tier 2 was failing.
  *
  * Numeric ids are reported as `probable` rather than `exact`, because a bare
  * number in a path could equally be a site-internal id. The resolver verifies
@@ -29,7 +29,7 @@ export interface UrlIdCandidate {
   mediaType?: MediaType;
   season?: number;
   episode?: number;
-  /** `exact` — an unambiguous marker. `probable` — a bare id needing verification. */
+  /** `exact` - an unambiguous marker. `probable` - a bare id needing verification. */
   confidence: 'exact' | 'probable';
 }
 
@@ -56,8 +56,8 @@ function isPlausibleSeasonEpisode(value: string): boolean {
 /**
  * Season and episode numbers written into a URL.
  *
- * Services spell this out in the path — `/season-1/episode-3/`, `/s01e03/`,
- * `?season=1&episode=3` — even when the page itself only shows the series name.
+ * Services spell this out in the path - `/season-1/episode-3/`, `/s01e03/`,
+ * `?season=1&episode=3` - even when the page itself only shows the series name.
  * Without reading it, every episode of a show resolves to the same thing and
  * the episode count never moves off one.
  */

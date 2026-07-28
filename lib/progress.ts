@@ -4,7 +4,7 @@ import { COVERAGE_BUCKETS } from './types';
  * Mapping playback position onto coverage buckets.
  *
  * Kept separate from the content script so the seek-versus-playback rule can be
- * tested directly — it's the invariant that stops "skip to the credits" from
+ * tested directly - it's the invariant that stops "skip to the credits" from
  * marking a film watched.
  */
 
@@ -26,7 +26,7 @@ export interface DurationSource {
  * Runtime in seconds, or 0 if not yet knowable.
  *
  * `video.duration` is not dependable on streaming sites. Players built on Media
- * Source Extensions — which is most of them — report `NaN` until the manifest
+ * Source Extensions - which is most of them - report `NaN` until the manifest
  * is parsed, and `Infinity` for streams whose end isn't declared. In both cases
  * the real runtime is in `seekable`, which is what the player's own scrub bar
  * reads.
@@ -60,8 +60,8 @@ export function bucketIndex(currentTimeSec: number, durationSec: number): number
  * 300-second video has 3-second buckets, so a 5-second sampling interval would
  * skip most of them and the completion threshold could never be reached.
  *
- * When the jump isn't consistent with continuous playback — a seek, a resume,
- * a backward scrub — only the bucket actually landed on is credited. Painting
+ * When the jump isn't consistent with continuous playback - a seek, a resume,
+ * a backward scrub - only the bucket actually landed on is credited. Painting
  * over the skipped range is exactly the failure this design exists to prevent.
  */
 export function bucketsCovered(

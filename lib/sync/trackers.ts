@@ -6,8 +6,8 @@ import type { Movie, Session, SyncProvider } from '../types';
  * Pushing confirmed history to Simkl and Trakt.
  *
  * Both use a device/PIN flow rather than a redirect flow. A browser extension
- * is a public client — anything in the bundle is readable by anyone who
- * installs it — so there is nowhere safe to keep a shared secret. Device flow
+ * is a public client - anything in the bundle is readable by anyone who
+ * installs it - so there is nowhere safe to keep a shared secret. Device flow
  * also avoids registering a redirect URL against an extension id that changes
  * between development and the store.
  *
@@ -69,7 +69,7 @@ export async function buildHistory(): Promise<HistoryItem[]> {
 
     if (complete.length === 0) {
       // Confirmed watched but its sessions were pruned. Only meaningful for a
-      // film — an episode with no session has no episode number to send.
+      // film - an episode with no session has no episode number to send.
       if (movie.mediaType === 'movie') {
         items.push({
           ...base,
@@ -95,7 +95,7 @@ export async function buildHistory(): Promise<HistoryItem[]> {
 /**
  * Both services record *episodes*, never whole shows.
  *
- * Sending a show with only its ids logs nothing useful — it has to carry the
+ * Sending a show with only its ids logs nothing useful - it has to carry the
  * season and episode structure, with a watch date on each episode. So episodes
  * are grouped back under their show and season here.
  */
@@ -152,7 +152,7 @@ function toPayload(items: HistoryItem[]) {
 }
 
 // ---------------------------------------------------------------------------
-// Simkl — PIN flow
+// Simkl - PIN flow
 // ---------------------------------------------------------------------------
 
 const SIMKL = 'https://api.simkl.com';
@@ -211,7 +211,7 @@ async function simklPush(items: HistoryItem[]): Promise<number> {
 }
 
 // ---------------------------------------------------------------------------
-// Trakt — device flow
+// Trakt - device flow
 // ---------------------------------------------------------------------------
 
 const TRAKT = 'https://api.trakt.tv';

@@ -11,7 +11,7 @@ import type { SearchQueryResponse } from './messages';
  * Turning a search query into a watchlist offer.
  *
  * Searching for a film is a statement of interest, and the moment straight
- * after is the cheapest time to save it — far cheaper than remembering to add
+ * after is the cheapest time to save it - far cheaper than remembering to add
  * it later, which is the step everyone skips.
  *
  * Held to a higher bar than watch detection. A wrong entry appearing in a
@@ -30,7 +30,7 @@ const NOT_A_TITLE = /^(https?:|www\.|\w+\.(com|net|org|io)\b)|^\s*$/i;
  * Goes straight there rather than through the confirm queue: the user picked
  * this one deliberately, so asking again would be asking twice. Details are
  * enriched from TMDB when a key is configured, but the save doesn't depend on
- * it — the title and year carried from the search are enough.
+ * it - the title and year carried from the search are enough.
  */
 export async function addFromSearch(
   tmdbId: number,
@@ -67,7 +67,7 @@ export async function offerFromSearch(query: string): Promise<SearchQueryRespons
 
   const settings = await getSettings();
 
-  // Local index first, exactly as watch detection does — a search shouldn't be
+  // Local index first, exactly as watch detection does - a search shouldn't be
   // the thing that starts sending queries to TMDB.
   let candidates = await lookupLocal(trimmed);
 

@@ -2,7 +2,7 @@
  * Fetching that survives a long run.
  *
  * These scripts make tens of thousands of requests, and TMDB drops connections
- * intermittently — an ECONNRESET is normal at that volume, not exceptional.
+ * intermittently - an ECONNRESET is normal at that volume, not exceptional.
  * Left unhandled, a single dropped socket rejected a `Promise.all` and threw
  * away forty minutes of completed work.
  *
@@ -26,7 +26,7 @@ function delay(ms: number): Promise<void> {
 /**
  * GET and parse JSON, retrying transient failures.
  *
- * Returns null for a genuine 404 — a question answered, not a failure — and
+ * Returns null for a genuine 404 - a question answered, not a failure - and
  * for anything still failing after the retries are spent.
  */
 export async function getJson<T>(

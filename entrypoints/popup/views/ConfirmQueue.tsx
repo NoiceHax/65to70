@@ -200,7 +200,7 @@ function QueueItem({
         <p className="meta">
           {ready === false ? (
             <>
-              Nothing to match against yet — load a title index or add a TMDB
+              Nothing to match against yet - load a title index or add a TMDB
               key.{' '}
               <button
                 className="link"

@@ -32,7 +32,7 @@ export interface PageMetaMessage {
    *
    * Streaming sites routinely serve the player from a separate domain. Host
    * permissions are per-origin and `allFrames` only injects into frames whose
-   * own URL matches a granted pattern — so granting the site the user typed
+   * own URL matches a granted pattern - so granting the site the user typed
    * does not reach the frame that actually holds the video. Reporting these
    * lets the popup offer the missing grant instead of silently recording
    * nothing.
@@ -62,7 +62,7 @@ export interface MediaProgressMessage {
    * needed to turn one into the other often isn't known in the page. Streaming
    * players report `duration` as NaN with an empty `seekable` range, and the
    * only reliable runtime comes from the catalogue entry the background
-   * resolves — so the background is where that conversion belongs.
+   * resolves - so the background is where that conversion belongs.
    */
   samples: number[];
   currentTimeSec: number;
@@ -80,7 +80,7 @@ export interface MediaProgressMessage {
  *
  * Content scripts can't reach the extension's IndexedDB, so the background
  * hands over a compact, already-normalised list. Scoping the overlay to titles
- * the user already has a relationship with is what makes it tractable —
+ * the user already has a relationship with is what makes it tractable -
  * recognising arbitrary film names in arbitrary page text is not.
  */
 export interface LibraryRequest {
@@ -110,13 +110,20 @@ export interface LibraryResponse {
  *
  * Only sent when the resolver already knows what it was. Asking "is this
  * right?" about a confident guess is a reasonable interruption; asking the user
- * to identify something from scratch mid-page is not — that belongs in the
+ * to identify something from scratch mid-page is not - that belongs in the
  * queue.
  */
 export interface ConfirmPromptMessage {
   type: 'confirm-prompt';
   pendingId: number;
-  tmdbId: number;
+  /**
+   * Absent when the title was read but not matched to a catalogue entry.
+   *
+   * That happens constantly with anything new or regional, and staying silent
+   * about it was wrong: the viewer got no sign the extension had noticed. The
+   * prompt still appears, it just cannot offer to record it yet.
+   */
+  tmdbId?: number;
   mediaType: 'movie' | 'tv';
   title: string;
   year?: number;
@@ -127,7 +134,8 @@ export interface ToastActionMessage {
   type: 'toast-action';
   action: 'confirm' | 'dismiss' | 'ignore';
   pendingId: number;
-  tmdbId: number;
+  /** Absent when the title was never matched, so there is nothing to confirm. */
+  tmdbId?: number;
   mediaType: 'movie' | 'tv';
   rating: number | null;
 }
@@ -137,7 +145,7 @@ export interface ToastActionMessage {
  *
  * Searching for a film is a statement of interest, and the moment right after
  * is when saving it costs nothing. The background decides whether the query
- * names something real and whether it's already known — the overlay only asks.
+ * names something real and whether it's already known - the overlay only asks.
  */
 export interface SearchQueryMessage {
   type: 'search-query';

@@ -6,7 +6,7 @@
  * Resolving a title normally means asking TMDB, which reveals the title to
  * them. This index exists so the common case never leaves the machine: the
  * most popular titles are matched entirely locally, and the network is only
- * touched for the long tail — and only if the user opted in.
+ * touched for the long tail - and only if the user opted in.
  *
  * Two things learned while testing that shape the build:
  *
@@ -164,7 +164,7 @@ async function main(): Promise<void> {
   const todo = top.filter((row) => !have.has(row.id));
 
   if (entries.length > 0) {
-    console.log(`  ${entries.length} already fetched — resuming`);
+    console.log(`  ${entries.length} already fetched - resuming`);
   }
   console.log(`Fetching details for ${todo.length} titles…`);
 
@@ -188,9 +188,9 @@ async function main(): Promise<void> {
 
   console.log(`\nWrote ${entries.length} titles to ${OUT_PATH}`);
   if (dropped > 0) {
-    console.warn(`${dropped} request(s) failed after retries — re-run to fill the gaps.`);
+    console.warn(`${dropped} request(s) failed after retries - re-run to fill the gaps.`);
   }
-  console.log('Rebuild the extension (npm run build) — it loads this itself.');
+  console.log('Rebuild the extension (npm run build) - it loads this itself.');
 }
 
 await main();

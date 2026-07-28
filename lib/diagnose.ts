@@ -1,7 +1,7 @@
 /**
  * A snapshot of what a page offers, gathered without devtools.
  *
- * Some sites fight inspection — they detect the devtools panel by window
+ * Some sites fight inspection - they detect the devtools panel by window
  * geometry or `debugger` timing and blank the page, freeze, or navigate away.
  * That makes the ordinary way of working out which selector holds the title
  * unavailable exactly where it's most needed.
@@ -11,7 +11,7 @@
  * result somewhere useful and an adapter can be written from it.
  *
  * The function below is injected verbatim into the page, so it must be entirely
- * self-contained — no imports, no closure over anything in this module.
+ * self-contained - no imports, no closure over anything in this module.
  */
 
 export interface FrameReport {
@@ -31,7 +31,7 @@ export interface FrameReport {
 }
 
 /**
- * Collected inside the page. Deliberately verbose — the point is to see what
+ * Collected inside the page. Deliberately verbose - the point is to see what
  * exists, not to guess in advance which part matters.
  */
 export function collectFrameReport(): FrameReport {

@@ -81,7 +81,7 @@ describe('Prime Video', () => {
 
 describe('JW Player', () => {
   // Matched by its own DOM rather than by hostname, so one adapter covers every
-  // site embedding it — including ones never looked at.
+  // site embedding it - including ones never looked at.
   const url = 'https://net52.cc/play.php?id=81446739';
 
   it('reads the title from the player, whatever the host', () => {
@@ -128,7 +128,7 @@ describe('JW Player', () => {
   });
 
   it('reports a known episode even when the season is not stated', () => {
-    // "3 Seasons" is a count, not a number — it does not say which one is
+    // "3 Seasons" is a count, not a number - it does not say which one is
     // playing. Inventing a season would put wrong data in a diary.
     const doc = docFrom(`
       <body>

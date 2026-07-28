@@ -140,7 +140,7 @@ async function poll(): Promise<void> {
      * own process and shows up as a separate target of type `iframe`, so a
      * content script inside an embedded player logs somewhere `page` never
      * covers. Missing those made an injected script look like one that had
-     * never run — the opposite conclusion.
+     * never run - the opposite conclusion.
      */
     const isFrame =
       ['page', 'iframe', 'webview', 'other'].includes(target.type) &&
@@ -151,7 +151,7 @@ async function poll(): Promise<void> {
 }
 
 console.log(`${DIM}Watching Chrome on port ${PORT}. Showing [keeper] logs${SHOW_ALL ? ' and everything else' : ''}.${RESET}`);
-console.log(`${DIM}Service workers sleep when idle — a gap in output is normal.${RESET}\n`);
+console.log(`${DIM}Service workers sleep when idle - a gap in output is normal.${RESET}\n`);
 
 await poll();
 // Workers restart and tabs open; re-scan so neither is missed.

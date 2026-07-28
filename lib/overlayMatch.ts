@@ -12,7 +12,7 @@ import type { LibraryEntry } from './messages';
 /**
  * Longest library title contained in the heading.
  *
- * Entries are expected longest-first, so the first hit is the most specific —
+ * Entries are expected longest-first, so the first hit is the most specific -
  * "Blade Runner 2049" wins over "Blade Runner" when both are in the library.
  *
  * The boundary check is what stops substring matches from firing on unrelated

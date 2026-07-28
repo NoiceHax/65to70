@@ -5,7 +5,7 @@ import { activeTracking, type ActiveTracking } from '@/lib/db';
  * What's playing right now.
  *
  * Sits above the tabs and shows on every screen, because "is this thing even
- * working?" was the question that took longest to answer during development —
+ * working?" was the question that took longest to answer during development -
  * and a user has no logs to fall back on. A live row answers it at a glance.
  *
  * Polls while the popup is open. A popup is short-lived and only visible when

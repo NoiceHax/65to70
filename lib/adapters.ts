@@ -2,7 +2,7 @@ import type { PageMetaResult } from './pageMeta';
 import { seasonEpisodeFromUrl } from './urlIds';
 
 /**
- * Tier 1 — per-platform readers.
+ * Tier 1 - per-platform readers.
  *
  * The premium services are the one place Tier 2 genuinely can't work. Netflix's
  * document title is just "Netflix" on every page, and Prime's is close to
@@ -12,7 +12,7 @@ import { seasonEpisodeFromUrl } from './urlIds';
  * Each adapter emits an ordinary `PageMetaResult` with the `manual` strategy,
  * which outranks every generic source. Crucially it emits a *string* in a shape
  * the existing cleaner already understands ("Breaking Bad S1E2") rather than a
- * bespoke structure — so season and episode parsing, ranking and matching all
+ * bespoke structure - so season and episode parsing, ranking and matching all
  * carry over unchanged.
  *
  * An adapter that returns null costs nothing: the generic cascade runs anyway.
@@ -34,7 +34,7 @@ function text(doc: Document, selector: string): string | null {
  * An "S3 E12" label somewhere in the player chrome.
  *
  * Checked element by element rather than against the whole page's text.
- * Concatenated text nodes run together — "How I Met Your MotherS3 E12" — and a
+ * Concatenated text nodes run together - "How I Met Your MotherS3 E12" - and a
  * word-boundary match then fails on the very case it was written for. Looking
  * at each element's own text sidesteps that and is more precise besides:
  * matching only short, label-shaped strings avoids picking a number out of a
@@ -160,7 +160,7 @@ const hotstar: SiteAdapter = {
     if (!title || title.length < 2) return null;
 
     /*
-     * Series need their episode, and this adapter never read one — so every
+     * Series need their episode, and this adapter never read one - so every
      * episode of a show resolved to the same title and the count never moved
      * off one.
      *
@@ -183,7 +183,7 @@ const hotstar: SiteAdapter = {
 // ---------------------------------------------------------------------------
 
 /**
- * Parse the player's secondary line — "2024 U/A 13+ 1h 46m".
+ * Parse the player's secondary line - "2024 U/A 13+ 1h 46m".
  *
  * Carries the year and runtime, and for a series the episode, all in one
  * string. Worth reading properly: the runtime is authoritative where the media
@@ -198,7 +198,7 @@ export function parseJwSecondary(text: string): {
   const out: { year?: number; runtimeMinutes?: number; season?: number; episode?: number } = {};
 
   /*
-   * "Ep. 9 - Greed v/s Need" — episode stated on its own.
+   * "Ep. 9 - Greed v/s Need" - episode stated on its own.
    *
    * Read before anything else, because a season may not be stated at all: this
    * player writes "1 Seasons", a count rather than a number, and never says
@@ -230,7 +230,7 @@ export function parseJwSecondary(text: string): {
    *
    * The only sample available was a film, where this line reads "2024 U/A 13+
    * 1h 46m" and carries no episode at all. Rather than guess one format and
-   * silently fail on the others, all the plausible ones are accepted — they're
+   * silently fail on the others, all the plausible ones are accepted - they're
    * distinctive enough not to collide with each other or with a runtime.
    */
   const episodePatterns = [
@@ -260,7 +260,7 @@ export function parseJwSecondary(text: string): {
  *
  * This is the most useful adapter in the set precisely because it isn't
  * site-specific. JW Player is a commercial player embedded across a great many
- * streaming sites, and its class names are stable and documented — so one
+ * streaming sites, and its class names are stable and documented - so one
  * adapter covers every site that uses it, including ones nobody has looked at.
  *
  * It also solves the case that host adapters cannot: a single-page app that
@@ -303,7 +303,7 @@ const jwPlayer: SiteAdapter = {
  * Host adapters first, then player adapters.
  *
  * A host adapter knows the specific service and can be precise about it. A
- * player adapter is the fallback that generalises — it recognises the software
+ * player adapter is the fallback that generalises - it recognises the software
  * rather than the site, which is what makes it work on sites never seen before.
  */
 const ADAPTERS: SiteAdapter[] = [netflix, primeVideo, hotstar];
@@ -335,7 +335,7 @@ export function readAdapterMeta(
   }
 
   // Then by player. Recognising the software rather than the site is what makes
-  // this work on sites nobody has written an adapter for — and it is the only
+  // this work on sites nobody has written an adapter for - and it is the only
   // thing that works when the page never changes its URL and the top frame
   // shows nothing but a home page.
   for (const adapter of PLAYER_ADAPTERS) {

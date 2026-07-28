@@ -40,7 +40,7 @@ describe('watchlist', () => {
 
     const entries = await watchlist();
     expect(entries).toHaveLength(1);
-    // Provenance survives the merge — that's what makes the list trustworthy.
+    // Provenance survives the merge - that's what makes the list trustworthy.
     expect(entries[0].savedOn).toEqual(['netflix', 'prime']);
     expect(entries[0].addedAt).toBe('2024-03-02');
   });

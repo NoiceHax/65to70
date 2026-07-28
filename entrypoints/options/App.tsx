@@ -61,7 +61,7 @@ function App() {
 
   /**
    * Device flow: show the user a code, then poll until they've approved it.
-   * Polling respects the interval the service asked for — going faster gets
+   * Polling respects the interval the service asked for - going faster gets
    * the request throttled, not answered sooner.
    */
   const connect = async (provider: SyncProvider) => {
@@ -192,7 +192,7 @@ function App() {
         <h2>Identifying titles</h2>
         <p className="note">
           Keeper tracks what you watch entirely offline. Turning a title into a
-          canonical entry — which is what syncing and availability need — takes a
+          canonical entry - which is what syncing and availability need - takes a
           free TMDB API key.
         </p>
 
@@ -220,7 +220,7 @@ function App() {
             <strong>Look up titles by name</strong>
             <em>
               When a page has no catalogue id, search TMDB for the title text.
-              This tells TMDB that someone searched that title — not who, and not
+              This tells TMDB that someone searched that title - not who, and not
               that it was watched. Off by default; ids found in the page URL are
               always resolved without this.
             </em>
@@ -246,7 +246,7 @@ function App() {
         <h2>Sync out</h2>
         <p className="note">
           Only titles you have confirmed are ever sent. Register your own app
-          with each service and paste its credentials — an extension can't keep
+          with each service and paste its credentials - an extension can't keep
           a shared secret, since anything in the bundle is readable by anyone
           who installs it.
         </p>
@@ -353,7 +353,7 @@ function App() {
         <p className="note">
           These let Keeper identify titles, say where things are streaming, and
           suggest films without asking anything online. They ship inside the
-          extension and load themselves — there is nothing to do here unless
+          extension and load themselves - there is nothing to do here unless
           something says it&apos;s missing.
         </p>
         <p className="hint">
@@ -367,7 +367,7 @@ function App() {
             <strong>Title index</strong>
             <em>
               {titleIndex.loaded
-                ? `${titleIndex.titles.toLocaleString()} titles — most films resolve without the network`
+                ? `${titleIndex.titles.toLocaleString()} titles - most films resolve without the network`
                 : 'Not loaded. Titles are resolved online instead.'}
             </em>
           </div>
@@ -435,7 +435,7 @@ function App() {
             <strong>Recommendations</strong>
             <em>
               {similar.loaded
-                ? `${similar.titles.toLocaleString()} titles with relationships — suggestions run offline`
+                ? `${similar.titles.toLocaleString()} titles with relationships - suggestions run offline`
                 : 'Not loaded. The "For you" tab has nothing to work from.'}
             </em>
           </div>

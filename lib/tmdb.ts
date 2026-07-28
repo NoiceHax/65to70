@@ -135,7 +135,7 @@ export async function getById(
  *
  * The id could belong to either collection, and a site-internal id belongs to
  * neither. Trying movie first and falling back to tv is what turns a `probable`
- * candidate into a verified match — or discards it.
+ * candidate into a verified match - or discards it.
  */
 export async function verifyId(
   tmdbId: number,

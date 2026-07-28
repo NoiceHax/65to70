@@ -15,7 +15,7 @@ export default defineConfig({
      * By default web-ext launches a throwaway profile, which wipes every host
      * permission on restart. Since Keeper asks for nothing at install and is
      * inert until sites are granted, that meant every dev restart began with
-     * an extension that could not do anything — and a log that looked like a
+     * an extension that could not do anything - and a log that looked like a
      * permissions bug rather than a fresh profile.
      */
     chromiumProfile: resolve('.wxt/chrome-profile'),
@@ -36,8 +36,12 @@ export default defineConfig({
       'alarms',
       // Reading where each frame in a tab actually is, after redirects. Embed
       // hosts redirect, so an iframe's src attribute names the wrong origin to
-      // grant. This reads frame URLs only — never their contents.
+      // grant. This reads frame URLs only - never their contents.
       'webNavigation',
+      // Saying so when a streaming site is open that Keeper is not allowed to
+      // run on. No content script of ours exists on an ungranted site, so
+      // there is nothing in the page to draw a prompt with.
+      'notifications',
     ],
     // Deliberately empty. Host access is granted per-site by the user at
     // runtime; nothing is requested at install. See lib/permissions.ts.

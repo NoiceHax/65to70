@@ -6,7 +6,7 @@ import { suggestQueue, type QueueSuggestion } from '@/lib/queue';
  *
  * Orders the list the user already built rather than proposing new titles, so
  * there's no cold start and nothing to be wrong about. Every line states a
- * checkable fact — never a match percentage.
+ * checkable fact - never a match percentage.
  */
 
 const BUDGETS = [

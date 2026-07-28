@@ -24,7 +24,7 @@ import type { PendingDetection, Session } from './types';
  * script only reports which buckets it newly saw.
  *
  * Per-tab state lives in `storage.session` rather than a module variable
- * because MV3 service workers are killed after ~30 seconds idle — which is
+ * because MV3 service workers are killed after ~30 seconds idle - which is
  * shorter than the gap between progress reports, so an in-memory map would be
  * empty most of the time.
  */
@@ -38,7 +38,7 @@ interface TabState {
   durationSec?: number;
   hostname?: string;
   url?: string;
-  /** Metadata from the top frame — preferred, since embedded players are iframes. */
+  /** Metadata from the top frame - preferred, since embedded players are iframes. */
   metaTop?: PageMetaResult[];
   /** Metadata from a subframe, used only when the top frame offered none. */
   metaSub?: PageMetaResult[];
@@ -73,7 +73,7 @@ export async function clearTabState(tabId: number): Promise<void> {
 /**
  * Best usable title for a tab.
  *
- * Discovery order is not preference order — the most structured source is not
+ * Discovery order is not preference order - the most structured source is not
  * always the most truthful. A client-rendered site bakes its brand name into
  * `og:title` on every page, so ranking has to demote it below the live
  * `document.title` and reject anything that is just the site's own name.
@@ -89,7 +89,7 @@ export function bestTitle(state: TabState): (CleanedTitle & { raw: string }) | n
     if (!isUsableTitle(cleaned)) continue;
 
     // A source that stated the episode outright beats one parsed out of a
-    // title string — and can express a known episode in an unknown season,
+    // title string - and can express a known episode in an unknown season,
     // which the string form cannot.
     const season = cleaned.season ?? candidate.season;
     const episode = cleaned.episode ?? candidate.episode;
@@ -130,8 +130,8 @@ export async function handlePageMeta(tabId: number, msg: PageMetaMessage): Promi
     state.metaSub = msg.candidates;
     state.hostname ??= msg.hostname;
 
-    // Merge rather than replace. These sites chain their embeds — the page
-    // loads a player host, which loads the actual stream host — so the next
+    // Merge rather than replace. These sites chain their embeds - the page
+    // loads a player host, which loads the actual stream host - so the next
     // origin to grant is often only visible from inside the frame that was
     // just granted. Keeping both means the chain can be followed one link at
     // a time instead of dead-ending.
@@ -176,7 +176,7 @@ function looksLikeWatchPage(msg: PageMetaMessage): boolean {
  * Queue a title from page data alone, without waiting for playback.
  *
  * Everything used to be gated behind finding a `<video>`, which meant a page
- * whose title had been read perfectly well produced nothing at all — the
+ * whose title had been read perfectly well produced nothing at all - the
  * element was in a closed shadow root, or a frame that couldn't be reached, and
  * the identification was thrown away with it.
  *
@@ -209,7 +209,7 @@ async function maybeQueueFromPage(
    * A different film in the same tab gets its own session.
    *
    * Without this the second film reuses the first one's session, and a session
-   * that already carries a queued entry is never queued again — so the title is
+   * that already carries a queued entry is never queued again - so the title is
    * read correctly, matched correctly, and then dropped on the floor without a
    * word. Watching two things in one tab is completely ordinary, so this was
    * not an edge case.
@@ -246,7 +246,7 @@ async function endSession(sessionId: number): Promise<void> {
   await db.sessions.update(sessionId, { stoppedAt: Date.now() });
 
   // Drop rows for glances and mis-fires so the database doesn't fill with
-  // noise — but never one the user has been asked to confirm. Sessions created
+  // noise - but never one the user has been asked to confirm. Sessions created
   // from page data alone carry no coverage by design, and pruning those would
   // delete the identification along with them.
   const queued = await db.pending.where('sessionId').equals(sessionId).count();
@@ -266,7 +266,7 @@ export async function handleMediaProgress(
   const state = await getTabState(tabId);
   state.hostname ??= msg.hostname;
 
-  // A changed duration means the player swapped media — an ad, or the next
+  // A changed duration means the player swapped media - an ad, or the next
   // episode auto-playing. Close the old session instead of blending two titles.
   if (
     state.sessionId !== undefined &&
@@ -296,7 +296,7 @@ export async function handleMediaProgress(
      * Ask as soon as something is playing, not at the end.
      *
      * Waiting for the completion threshold meant two hours of silence before
-     * the extension gave any sign it had noticed — and if anything upstream was
+     * the extension gave any sign it had noticed - and if anything upstream was
      * wrong, the silence was indistinguishable from being broken. Confirming
      * identity up front is also simply a better question: "is this Supergirl?"
      * is answerable while it's on screen.
@@ -320,7 +320,7 @@ export async function handleMediaProgress(
    * Positions become coverage here, not in the page.
    *
    * The runtime is what turns one into the other, and the player frequently
-   * cannot supply it — NaN duration, empty seekable range. The resolved
+   * cannot supply it - NaN duration, empty seekable range. The resolved
    * catalogue entry can, and is more accurate anyway, since it isn't inflated
    * by adverts spliced into the stream. Until something knows the runtime,
    * positions are simply held; nothing is lost, the conversion just waits.
@@ -391,7 +391,7 @@ export async function handleMediaProgress(
  * Queue a completed session for user confirmation.
  *
  * This is as far as a detection ever gets on its own. Nothing is written to a
- * diary or pushed to a sync target until the user confirms it — a wrong entry
+ * diary or pushed to a sync target until the user confirms it - a wrong entry
  * in a curated Letterboxd diary is worse than a missing one.
  */
 async function createPending(
@@ -452,7 +452,7 @@ async function createPending(
   );
 
   // Resolve straight away so the confirm queue has candidates ready when the
-  // user opens it. Resolution never marks anything watched — that still needs
+  // user opens it. Resolution never marks anything watched - that still needs
   // an explicit confirmation.
   try {
     const outcome = await resolvePending(pendingId);
@@ -468,7 +468,7 @@ async function createPending(
     /*
      * Drop what turned out not to be a film.
      *
-     * Identifying from page data alone means site chrome gets picked up too —
+     * Identifying from page data alone means site chrome gets picked up too -
      * a homepage titled "Home - NetMirror", a hidden utility frame called
      * "RotateCookiesPage". Asking the user to sort those out is offloading a
      * machine's job onto them.
@@ -494,18 +494,28 @@ async function createPending(
       return;
     }
 
-    // Ask in the page, while the credits are still rolling — but only when the
-    // resolver already knows what it was. Confirming a confident guess is a
-    // reasonable interruption; asking someone to identify a film from scratch
-    // mid-page is not, and that stays in the queue.
-    if (outcome.status === 'resolved' && outcome.movie) {
+    /*
+     * Say something in the page either way.
+     *
+     * This used to fire only on a confident match, which meant anything new or
+     * regional produced complete silence. The viewer had no way to tell a
+     * working extension from a broken one, which is the failure mode this
+     * whole project kept running into.
+     *
+     * A matched title can be confirmed on the spot. An unmatched one is still
+     * named, so at least it is visible that something was noticed.
+     */
+    const matchedTitle = outcome.movie?.title;
+    const shownTitle = matchedTitle ?? pending.cleanedTitle;
+
+    if (shownTitle) {
       const prompt: ConfirmPromptMessage = {
         type: 'confirm-prompt',
         pendingId,
-        tmdbId: outcome.movie.tmdbId,
-        mediaType: outcome.movie.mediaType,
-        title: outcome.movie.title,
-        year: outcome.movie.year,
+        tmdbId: outcome.movie?.tmdbId,
+        mediaType: outcome.movie?.mediaType ?? (pending.season !== undefined ? 'tv' : 'movie'),
+        title: shownTitle,
+        year: outcome.movie?.year ?? pending.year,
       };
       browser.tabs.sendMessage(tabId, prompt).catch(() => {
         // Tab closed or navigated away; the queue still has it.
@@ -541,7 +551,7 @@ export async function tabDiagnostics(tabId: number): Promise<TabDiagnostics> {
 
   // Where the frames actually are now takes priority over what the markup
   // said. Embed hosts redirect, and a src attribute names the origin the
-  // player has already left — granting that one changes nothing.
+  // player has already left - granting that one changes nothing.
   const live = await liveFramesForTab(tabId);
   const merged = new Map(
     (state.embeddedFrames ?? []).map((frame) => [frame.origin, frame]),

@@ -3,7 +3,7 @@
  *
  *   TMDB_API_KEY=xxx npx vite-node pipeline/buildAvailability.ts -- IN
  *
- * TMDB publishes no bulk export of watch-provider data — the only route is to
+ * TMDB publishes no bulk export of watch-provider data - the only route is to
  * ask `/discover` which titles each provider carries, one provider at a time.
  *
  * The awkward part is that `/discover` refuses to page past 500, so a provider
@@ -97,7 +97,7 @@ async function idsForProvider(providerId: number): Promise<{ ids: number[]; trun
       });
 
       // A page that never arrived after its retries. Counted in `dropped` and
-      // reported at the end — skipping it loses a few titles, aborting loses
+      // reported at the end - skipping it loses a few titles, aborting loses
       // the whole run.
       if (!data) {
         page++;
@@ -109,7 +109,7 @@ async function idsForProvider(providerId: number): Promise<{ ids: number[]; trun
 
       if (data.total_pages > MAX_PAGE) {
         // One year on one provider exceeding 10,000 titles would need a finer
-        // shard key. Report it — never let it pass as complete.
+        // shard key. Report it - never let it pass as complete.
         if (!truncated.includes(year)) truncated.push(year);
       }
       page++;
@@ -167,10 +167,10 @@ async function main(): Promise<void> {
   if (dropped > 0) {
     // An index short of a few pages is fine; an index that quietly hides that
     // fact is not.
-    console.warn(`\n${dropped} request(s) failed after retries — some titles are missing.`);
+    console.warn(`\n${dropped} request(s) failed after retries - some titles are missing.`);
   }
 
-  console.log('\nRebuild the extension (npm run build) — it loads this itself.');
+  console.log('\nRebuild the extension (npm run build) - it loads this itself.');
 }
 
 await main();

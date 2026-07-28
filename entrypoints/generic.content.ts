@@ -14,7 +14,7 @@ import type {
 } from '@/lib/messages';
 
 /**
- * Tier 2 detection — the generic fallback for any granted site.
+ * Tier 2 detection - the generic fallback for any granted site.
  *
  * Registered at runtime only, never in the manifest, so it can only ever run on
  * origins the user explicitly granted. See lib/permissions.ts.
@@ -33,7 +33,7 @@ const META_THROTTLE_MS = 1_000;
 /** Backstop for client-rendered titles that appear well after first paint. */
 const META_POLL_MS = 3_000;
 /**
- * Below this, it's an ad, a trailer, or a preview loop — not something anyone
+ * Below this, it's an ad, a trailer, or a preview loop - not something anyone
  * is going to want in their diary. The shortest real target is a ~22 minute
  * sitcom episode.
  */
@@ -66,7 +66,7 @@ function send(message: PageMetaMessage | MediaProgressMessage): void {
  *
  * Worth reading because the media element and the visible UI disagree
  * constantly on these sites: `duration` comes back NaN while the player renders
- * "1:23:45 / 2:14:30" a few pixels away. The runtime was never unavailable —
+ * "1:23:45 / 2:14:30" a few pixels away. The runtime was never unavailable -
  * it just wasn't exposed through the API being asked.
  */
 function clockFromPage(): PlayerClock | null {
@@ -88,7 +88,7 @@ function clockFromPage(): PlayerClock | null {
  * Runtime in seconds, from whichever source will say.
  *
  * The media element first, then the scrubber. Preferring the element is only
- * because it's cheaper to read, not because it's more trustworthy — on these
+ * because it's cheaper to read, not because it's more trustworthy - on these
  * players it frequently knows less than the interface it drives.
  */
 function mediaDuration(el: HTMLVideoElement): number {
@@ -115,7 +115,7 @@ function looksLikeContent(el: HTMLVideoElement): boolean {
 /**
  * Record where playback currently is.
  *
- * Just the position — no coverage maths here. Turning positions into coverage
+ * Just the position - no coverage maths here. Turning positions into coverage
  * needs the runtime, and on these players the runtime often isn't knowable in
  * the page at all. The background has the resolved catalogue entry, so it has
  * the runtime, so it does the conversion.
@@ -152,7 +152,7 @@ function onTimeUpdate(): void {
   //
   // The threshold is relative, not a flat few seconds. A seekable range grows
   // as a stream buffers, and a fixed epsilon would read that ordinary growth as
-  // a new film — tearing down and restarting the session over and over, losing
+  // a new film - tearing down and restarting the session over and over, losing
   // all coverage each time. A genuine ad-to-feature switch changes the duration
   // by an order of magnitude, so it still trips this easily.
   const changeThreshold = Math.max(DURATION_EPSILON_SEC, trackedDuration * 0.2);
@@ -208,7 +208,7 @@ function attach(el: HTMLVideoElement): void {
  *
  * `querySelectorAll` does not cross a shadow boundary, and several embed
  * players render their player into one. To a plain query those pages contain no
- * video at all — indistinguishable from a page that genuinely has none, which
+ * video at all - indistinguishable from a page that genuinely has none, which
  * is the least useful way for this to fail.
  *
  * Closed shadow roots stay unreachable; nothing can be done about those.
@@ -250,7 +250,7 @@ function reportState(): void {
   if (media) {
     console.log(
       `[keeper] tracking on ${location.hostname}`,
-      `— ${Math.round(trackedDuration / 60)} min`,
+      `- ${Math.round(trackedDuration / 60)} min`,
       isTopFrame ? '(top frame)' : '(iframe)',
     );
     return;
@@ -259,13 +259,13 @@ function reportState(): void {
   if (all > 0 && usable === 0) {
     // Print the raw values. "None usable" hides the difference between an ad
     // (short but valid), a stream whose manifest hasn't parsed yet (NaN), and
-    // an unbounded stream (Infinity) — which need completely different fixes.
+    // an unbounded stream (Infinity) - which need completely different fixes.
     const seen = findVideos()
       .map((el) => `duration=${el.duration} effective=${effectiveDuration(el)}`)
       .join('; ');
 
     console.log(
-      `[keeper] ${location.hostname}: ${all} video element(s), none over ${MIN_DURATION_SEC}s —`,
+      `[keeper] ${location.hostname}: ${all} video element(s), none over ${MIN_DURATION_SEC}s -`,
       seen,
     );
     return;
@@ -274,7 +274,7 @@ function reportState(): void {
   if (all === 0 && frames.length > 0) {
     // The single most common reason nothing gets recorded: the player lives in
     // a frame this extension has no permission to touch. Players are named
-    // separately from ad frames — these pages carry plenty of both, and only
+    // separately from ad frames - these pages carry plenty of both, and only
     // one of them is worth granting anything to.
     const players = frames.filter((f) => f.likelyPlayer).map((f) => f.origin);
     const others = frames.filter((f) => !f.likelyPlayer).map((f) => f.origin);
@@ -282,7 +282,7 @@ function reportState(): void {
     console.warn(
       `[keeper] ${location.hostname}: no video here.`,
       players.length > 0
-        ? `Player looks like ${players.join(', ')} — grant it in the popup.`
+        ? `Player looks like ${players.join(', ')} - grant it in the popup.`
         : 'No player-shaped frame found.',
       others.length > 0 ? `(also embedded, probably ads: ${others.join(', ')})` : '',
     );
@@ -308,21 +308,21 @@ function scanForMedia(): void {
  * Report page metadata whenever it actually changes.
  *
  * Keying this on the URL alone was a bug. A client-rendered site sets its real
- * title well after first paint without ever changing the URL, so the first —
- * wrong — snapshot was captured and never revisited. Comparing a signature of
+ * title well after first paint without ever changing the URL, so the first -
+ * wrong - snapshot was captured and never revisited. Comparing a signature of
  * the extracted values catches the late update instead; re-sending is harmless
  * because the background merges by tab.
  */
 /**
  * Cross-origin iframes on this page.
  *
- * Reading an iframe's `src` attribute is just a DOM read — it needs no access
+ * Reading an iframe's `src` attribute is just a DOM read - it needs no access
  * to the frame's contents, so this works even though the frame itself is off
  * limits. That's what makes it possible to name the origin that's missing
  * rather than leaving a site that records nothing and explains nothing.
  *
- * Runs in every frame, not only the top one. These sites chain their embeds —
- * the page loads a player host, which loads the actual stream host — so
+ * Runs in every frame, not only the top one. These sites chain their embeds -
+ * the page loads a player host, which loads the actual stream host - so
  * reporting only from the top frame stops one link short of the video.
  */
 function embeddedFrames(): { origin: string; likelyPlayer: boolean }[] {
@@ -358,7 +358,7 @@ function reportPageMeta(): void {
   if (now - lastMetaCheckAt < META_THROTTLE_MS) return;
   lastMetaCheckAt = now;
 
-  // Tier 1 first. On the premium services this is the only source that works —
+  // Tier 1 first. On the premium services this is the only source that works -
   // their document titles say nothing, because they have no reason to court
   // search engines for content they own.
   const adapterMeta = readAdapterMeta(document, location.href, location.hostname);
@@ -418,10 +418,19 @@ function handleConfirmPrompt(msg: ConfirmPromptMessage): void {
     browser.runtime.sendMessage(message).catch(() => {});
   };
 
+  // Nothing to confirm against when the title was read but not matched. Say
+  // what was seen rather than offering a button that cannot do anything.
+  const matched = msg.tmdbId !== undefined;
+
   showToast({
     title: msg.title,
     year: msg.year,
-    onConfirm: (rating) => reply('confirm', rating),
+    prompt: matched
+      ? 'Tracking this, is that right?'
+      : 'Tracking this. Not in the catalogue yet, so pick it in Keeper when you can.',
+    confirmLabel: matched ? 'Yes, track it' : 'OK',
+    showStars: matched,
+    onConfirm: (rating) => (matched ? reply('confirm', rating) : reply('ignore', null)),
     onDismiss: () => reply('dismiss', null),
     // Ignoring is not rejecting: the detection stays in the confirm queue.
     onIgnore: () => reply('ignore', null),
@@ -464,7 +473,7 @@ export default defineContentScript({
      * A streaming player inserts its <video> long before it knows the runtime:
      * with Media Source Extensions the duration is NaN until the manifest is
      * parsed. The observer above fires on the insertion, sees NaN, rejects the
-     * element as too short — and then never looks again, because the duration
+     * element as too short - and then never looks again, because the duration
      * arriving later changes no markup at all.
      *
      * These events are the signal that the answer has changed. Captured at the

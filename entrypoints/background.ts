@@ -8,11 +8,12 @@ import { confirmCandidate, dismissPending } from '@/lib/resolver';
 import { refreshBadge } from '@/lib/badge';
 import { loadBundledIndexes } from '@/lib/bundledIndexes';
 import { collectFrameReport, formatReports, type FrameReport } from '@/lib/diagnose';
+import { maybePromptForSite } from '@/lib/newSitePrompt';
 import type { KeeperMessage } from '@/lib/messages';
 
 export default defineBackground(() => {
   // Runtime content-script registrations persist across browser restarts, so
-  // these calls exist to repair drift — e.g. the user revoked a site through
+  // these calls exist to repair drift - e.g. the user revoked a site through
   // Chrome's own permissions UI rather than ours.
   // Prepared indexes that shipped in the build go in without being asked for.
   const seed = () => {
@@ -48,7 +49,7 @@ export default defineBackground(() => {
      *
      * scripting.executeScript with allFrames returns one result per frame,
      * which is what makes this workable on sites that put the player in an
-     * embed — the frame holding the video reports alongside its parent, and
+     * embed - the frame holding the video reports alongside its parent, and
      * neither needs a devtools panel open to be inspected.
      */
     if (msg.type === 'diagnose-page') {
@@ -81,10 +82,12 @@ export default defineBackground(() => {
       return;
     }
 
-    // The in-page prompt. Confirming here does exactly what the queue does —
+    // The in-page prompt. Confirming here does exactly what the queue does -
     // there is still only one path by which anything becomes "watched".
     if (msg.type === 'toast-action') {
-      if (msg.action === 'confirm') {
+      // Only a matched title can be confirmed from the page. An unmatched one
+      // stays in the queue, where it can be searched for properly.
+      if (msg.action === 'confirm' && msg.tmdbId !== undefined) {
         void confirmCandidate(msg.pendingId, msg.tmdbId, msg.mediaType, {
           rating: msg.rating,
         }).then(refreshBadge);
@@ -107,6 +110,11 @@ export default defineBackground(() => {
         break;
     }
     // No response for the fire-and-forget messages.
+  });
+
+  // Notice a streaming site we are not allowed to run on and say so once.
+  browser.tabs.onUpdated.addListener((_tabId, changeInfo) => {
+    if (changeInfo.url) void maybePromptForSite(changeInfo.url);
   });
 
   browser.tabs.onRemoved.addListener((tabId) => {

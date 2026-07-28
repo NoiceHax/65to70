@@ -12,7 +12,7 @@ import {
  * The merged watchlist.
  *
  * Shows provenance rather than hiding it. "Saved on Netflix and Prime" is the
- * information that makes a merged list trustworthy — without it the user has no
+ * information that makes a merged list trustworthy - without it the user has no
  * way to tell why something is here or where it came from.
  */
 export default function Watchlist() {

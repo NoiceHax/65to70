@@ -11,7 +11,7 @@ export interface Settings {
   /**
    * TMDB API key (v3). Optional.
    *
-   * Without it Keeper still tracks everything locally — detection, coverage,
+   * Without it Keeper still tracks everything locally - detection, coverage,
    * sessions and the confirm queue all work offline. What it can't do is turn a
    * title into a canonical id, which is what sync and availability need.
    */
@@ -22,7 +22,7 @@ export interface Settings {
    *
    * This is the one place the privacy promise has a seam, so it is off by
    * default and stated plainly in the options page. A lookup reveals to TMDB
-   * that someone searched a title — not who, and not that it was watched.
+   * that someone searched a title - not who, and not that it was watched.
    */
   allowNetworkResolve: boolean;
 
@@ -36,7 +36,7 @@ export interface Settings {
    * Tracker application credentials.
    *
    * Supplied by the user from their own registered app rather than baked into
-   * the bundle. An extension is a public client — anything shipped inside it is
+   * the bundle. An extension is a public client - anything shipped inside it is
    * readable by anyone who installs it, so a shared secret would not be secret.
    * Trakt's device flow requires a secret at token exchange, which is why it
    * needs both fields; Simkl's PIN flow needs only the id.

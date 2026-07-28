@@ -1,7 +1,7 @@
 import type { DetectionStrategy } from './types';
 
 /**
- * Tier 2 — pulling a title out of an arbitrary page.
+ * Tier 2 - pulling a title out of an arbitrary page.
  *
  * The premise this relies on: long-tail streaming sites do not strip metadata.
  * They can't afford to. Their traffic comes from ranking for "watch <film>
@@ -21,7 +21,7 @@ export interface PageMetaResult {
    * Season and episode, when a source stated them outright.
    *
    * Separate from the title string because they aren't always both knowable.
-   * One player names the episode but only the *number of seasons* — so the
+   * One player names the episode but only the *number of seasons* - so the
    * episode is certain and the season isn't, which a "Show S1E9" string cannot
    * express without inventing the part it doesn't know.
    */
@@ -199,8 +199,8 @@ export function extractPageMeta(doc: Document, url: string): PageMetaResult[] {
  *
  * `document-title` outranks `og:title`, which is the opposite of what the
  * discovery order suggests, and it's deliberate. On a client-rendered site the
- * `og:title` is baked into the shell at build time and never updates — it says
- * "Cineby" on every page — while `document.title` is rewritten by the app to
+ * `og:title` is baked into the shell at build time and never updates - it says
+ * "Cineby" on every page - while `document.title` is rewritten by the app to
  * the actual title. On server-rendered sites the two are usually identical, so
  * promoting `document.title` costs nothing there and rescues the SPA case.
  */
@@ -223,7 +223,7 @@ function normalizeForCompare(text: string): string {
   return text.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
 }
 
-/** Brand words derived from the hostname — "cineby.cc" yields {cineby}. */
+/** Brand words derived from the hostname - "cineby.cc" yields {cineby}. */
 export function brandTokens(hostname: string): Set<string> {
   const tokens = new Set<string>();
   for (const part of hostname.toLowerCase().split('.')) {
@@ -249,7 +249,7 @@ function scoreCandidate(candidate: PageMetaResult, brands: Set<string>): number 
     }
 
     // A title that opens with the site's own name is the landing page
-    // announcing itself — "JioHotstar - Watch TV Shows, Movies, ...". Heavily
+    // announcing itself - "JioHotstar - Watch TV Shows, Movies, ...". Heavily
     // penalised rather than rejected outright, since a show can legitimately
     // carry a service's name ("Hotstar Specials: ...").
     if (normalized.startsWith(brand)) score -= 400;

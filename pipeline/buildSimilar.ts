@@ -6,7 +6,7 @@
  * The point of doing this offline is that recommendations then cost nothing at
  * runtime and reveal nothing. A recommender that phones home with "here is
  * everything they have watched, what next?" is the one thing this project set
- * out not to build — so the relationships between films are computed here,
+ * out not to build - so the relationships between films are computed here,
  * once, and shipped. Your library never leaves your machine; the model comes
  * to it.
  *
@@ -48,7 +48,7 @@ interface IndexEntry {
 function seedTitles(): IndexEntry[] {
   const path = resolve(process.cwd(), 'public/data/titles.json');
   if (!existsSync(path)) {
-    console.error('Build the title index first — this seeds from it.');
+    console.error('Build the title index first - this seeds from it.');
     process.exit(1);
   }
 
@@ -104,7 +104,7 @@ async function main(): Promise<void> {
       similar[String(seed.i)] = recs.map((rec) => rec.id);
 
       // Keep display details for anything reachable, including titles outside
-      // the seed set — otherwise a recommendation arrives with no name.
+      // the seed set - otherwise a recommendation arrives with no name.
       for (const rec of recs) {
         const key = String(rec.id);
         if (titles[key]) continue;
@@ -128,8 +128,8 @@ async function main(): Promise<void> {
     `\nWrote ${Object.keys(similar).length} relationship lists ` +
       `covering ${Object.keys(titles).length} titles to ${outPath}`,
   );
-  if (dropped > 0) console.warn(`${dropped} request(s) failed after retries — re-run to fill the gaps.`);
-  console.log('Rebuild the extension (npm run build) — it loads this itself.');
+  if (dropped > 0) console.warn(`${dropped} request(s) failed after retries - re-run to fill the gaps.`);
+  console.log('Rebuild the extension (npm run build) - it loads this itself.');
 }
 
 await main();

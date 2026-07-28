@@ -21,9 +21,9 @@ export default function Library() {
   /**
    * The slider's value while it's being dragged.
    *
-   * Writing on every pointer move re-sorted the list underneath the cursor —
+   * Writing on every pointer move re-sorted the list underneath the cursor -
    * crossing the completion threshold moves a row from "Continue watching" to
-   * "Watched" — so the thing being dragged jumped away mid-drag. The value is
+   * "Watched" - so the thing being dragged jumped away mid-drag. The value is
    * held here until the drag ends, and only then committed.
    */
   const [draft, setDraft] = useState<number | null>(null);
@@ -84,8 +84,8 @@ export default function Library() {
         </span>
         <span className="meta">
           {/* Clicking the figure is what opens the override. Measurement is a
-              guess — padded streams, different cuts, reloads splitting a
-              viewing — and the person watching knows better than it does. */}
+              guess - padded streams, different cuts, reloads splitting a
+              viewing - and the person watching knows better than it does. */}
           <button
             className="pct"
             title="Adjust progress"

@@ -6,7 +6,7 @@ import { resolve } from 'node:path';
  * time. An explicit environment variable still wins, which keeps CI and
  * one-off overrides working without editing the file.
  *
- * `.env` is git-ignored. Nothing here is bundled into the extension — the
+ * `.env` is git-ignored. Nothing here is bundled into the extension - the
  * pipeline runs on your machine only.
  */
 export function loadEnv(): void {

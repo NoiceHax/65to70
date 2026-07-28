@@ -69,7 +69,7 @@ export default function Sites({ onChange }: { onChange: () => void }) {
 
       {/* Off by default and stated plainly. Per-origin grants stay the
           recommended path, but on sites that load the player from a rotating
-          third-party host they never finish — and asking someone to approve a
+          third-party host they never finish - and asking someone to approve a
           stream of unfamiliar domains is how ad origins get granted by
           mistake. */}
       <label className="check">
@@ -88,7 +88,7 @@ export default function Sites({ onChange }: { onChange: () => void }) {
           <em>
             Needed for sites that load the player from another domain and swap
             it as you switch servers. Keeper still only ever reads the video
-            element and the page title, and still uploads nothing — but this is
+            element and the page title, and still uploads nothing - but this is
             broad access, so it is off unless you turn it on.
           </em>
         </span>
@@ -116,7 +116,7 @@ export default function Sites({ onChange }: { onChange: () => void }) {
               ? 'Player found on this page'
               : diagnostics.scriptRan
                 ? 'Running here, but no player found yet'
-                : 'Not running on this page yet — try reloading'}
+                : 'Not running on this page yet - try reloading'}
           </div>
 
           {diagnostics.urlIds.length > 0 && (
@@ -162,7 +162,7 @@ export default function Sites({ onChange }: { onChange: () => void }) {
                       put in front of them. */}
                   {others.length > 0 && (
                     <p className="note dim">
-                      Also embedded, probably adverts — not needed for tracking:{' '}
+                      Also embedded, probably adverts - not needed for tracking:{' '}
                       {others.map((f) => new URL(f.origin).hostname).join(', ')}
                     </p>
                   )}
@@ -199,7 +199,7 @@ export default function Sites({ onChange }: { onChange: () => void }) {
       <p className="note">
         Marks films you have already seen or saved when they show up in search
         results. Granted separately, because these pages have nothing to do with
-        playback. Nothing is reordered or rewritten — only annotated — and no
+        playback. Nothing is reordered or rewritten - only annotated - and no
         request leaves your machine.
       </p>
 
@@ -218,7 +218,7 @@ export default function Sites({ onChange }: { onChange: () => void }) {
         ))}
       </ul>
 
-      {/* For sites the generic cascade can't read — an SPA that never changes
+      {/* For sites the generic cascade can't read - an SPA that never changes
           its URL, or one that fights devtools. Reports what every frame
           contains so a selector can be found without a panel open. */}
       <h2 className="spaced">Stuck on a site?</h2>

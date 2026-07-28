@@ -2,7 +2,7 @@
  * The in-page prompt shown when something finishes.
  *
  * This is the moment worth asking at. The confirm queue works, but it asks
- * later, out of context, when the film is no longer in mind — and a rating
+ * later, out of context, when the film is no longer in mind - and a rating
  * given at the credits is worth more than one reconstructed a week later.
  *
  * Rendered into a closed shadow root so the host page's CSS can't reach in and
@@ -23,7 +23,7 @@ export interface ToastOptions {
   dismissLabel?: string;
   /** Stars only make sense for something being watched, not something saved. */
   showStars?: boolean;
-  /** Called with a rating (1–5) or null when the user just says yes. */
+  /** Called with a rating (1-5) or null when the user just says yes. */
   onConfirm: (rating: number | null) => void;
   onDismiss: () => void;
   /** Called when the toast is closed without an answer. */
@@ -103,7 +103,7 @@ export function showToast(options: ToastOptions): void {
 
   const title = document.createElement('div');
   title.className = 'title';
-  // textContent, never innerHTML — the title came off a page we don't control.
+  // textContent, never innerHTML - the title came off a page we don't control.
   title.textContent = options.title;
   if (options.year) {
     const year = document.createElement('span');
@@ -113,9 +113,9 @@ export function showToast(options: ToastOptions): void {
   }
 
   const prompt = document.createElement('div');
-  // Asked at detection now, not at the end — so this settles what is playing,
+  // Asked at detection now, not at the end - so this settles what is playing,
   // not whether it was finished. Coverage still decides that.
-  prompt.textContent = options.prompt ?? 'Tracking this — is that right?';
+  prompt.textContent = options.prompt ?? 'Tracking this - is that right?';
 
   let rating: number | null = null;
   const stars = document.createElement('div');
@@ -179,7 +179,7 @@ export function showToast(options: ToastOptions): void {
   document.documentElement.appendChild(host);
 
   // Timing out leaves the detection in the confirm queue rather than dropping
-  // it — being ignored must never mean being discarded.
+  // it - being ignored must never mean being discarded.
   setTimeout(() => {
     if (document.getElementById(HOST_ID) === host) {
       options.onIgnore();

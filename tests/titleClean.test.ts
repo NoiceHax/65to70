@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { cleanTitle, isUsableTitle } from '@/lib/titleClean';
 
-describe('cleanTitle — SEO-stuffed page titles', () => {
+describe('cleanTitle - SEO-stuffed page titles', () => {
   it('cuts at a parenthesised year and drops trailing quality noise', () => {
     expect(cleanTitle('Watch Inception (2010) Online Free HD - SiteName')).toMatchObject({
       title: 'Inception',
@@ -25,7 +25,7 @@ describe('cleanTitle — SEO-stuffed page titles', () => {
   });
 });
 
-describe('cleanTitle — separator handling', () => {
+describe('cleanTitle - separator handling', () => {
   it('keeps title parts split by a hyphen, dropping only the noise segment', () => {
     // Naively taking the first segment would lose "Fallout".
     expect(cleanTitle('Mission: Impossible - Fallout | Watch Online Free')).toMatchObject({
@@ -41,7 +41,7 @@ describe('cleanTitle — separator handling', () => {
   });
 });
 
-describe('cleanTitle — series', () => {
+describe('cleanTitle - series', () => {
   it('parses SxxExx and treats it as a boundary, discarding the episode title', () => {
     expect(cleanTitle("Breaking Bad S01E02 - Cat's in the Bag... | FMovies")).toMatchObject({
       title: 'Breaking Bad',
@@ -76,7 +76,7 @@ describe('cleanTitle — series', () => {
   });
 });
 
-describe('cleanTitle — titles that look like noise', () => {
+describe('cleanTitle - titles that look like noise', () => {
   it('keeps "Movie" when it is part of the title', () => {
     expect(cleanTitle('The Lego Movie (2014) Full Movie Online Free')).toMatchObject({
       title: 'The Lego Movie',
@@ -110,7 +110,7 @@ describe('cleanTitle — titles that look like noise', () => {
   });
 });
 
-describe('cleanTitle — non-Latin scripts', () => {
+describe('cleanTitle - non-Latin scripts', () => {
   // Found by probing a live TMDB page, which served a Hindi title based on
   // region. An ASCII-only normaliser reduced it to nothing and the noise check
   // then discarded it as padding.

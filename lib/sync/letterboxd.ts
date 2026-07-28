@@ -4,19 +4,19 @@ import type { Movie, Session } from '../types';
 /**
  * Letterboxd diary export.
  *
- * Letterboxd has no public write API — it's invite-gated — so this is a file
+ * Letterboxd has no public write API - it's invite-gated - so this is a file
  * the user uploads themselves. That makes it the one sync target that can never
  * be automatic, which is worth stating plainly in the UI rather than letting
  * people discover it.
  *
  * Column set verified against the ecosystem's import tooling:
  *   Title, imdbID, tmdbID, Rating, WatchedDate
- * Rating is 0.5–5.0 in half steps; WatchedDate is YYYY-MM-DD. Providing an
+ * Rating is 0.5-5.0 in half steps; WatchedDate is YYYY-MM-DD. Providing an
  * imdbID or tmdbID makes the import an exact match rather than a title guess,
  * which is the difference between a clean import and a pile of near-misses.
  *
  * Note on likes: Letterboxd's importer has no column for them. A liked film
- * exports like any other and the heart has to be re-applied by hand — there is
+ * exports like any other and the heart has to be re-applied by hand - there is
  * no way around that from this side.
  */
 
@@ -44,7 +44,7 @@ const COLUMNS: (keyof DiaryRow)[] = [
  * RFC 4180 quoting.
  *
  * Film titles routinely contain commas ("Paris, Texas") and quotation marks,
- * and a mis-quoted row doesn't fail loudly — it silently shifts every later
+ * and a mis-quoted row doesn't fail loudly - it silently shifts every later
  * column, which is how an import ends up with the year in the rating field.
  */
 export function escapeCsv(value: string): string {
@@ -74,7 +74,7 @@ export function buildDiaryRows(movie: Movie, sessions: Session[]): DiaryRow[] {
     .filter((session) => session.complete === 1)
     .sort((a, b) => a.startedAt - b.startedAt);
 
-  // Confirmed as watched but with no surviving session rows — still worth one
+  // Confirmed as watched but with no surviving session rows - still worth one
   // entry, dated when it was confirmed.
   if (complete.length === 0) {
     if (movie.watched !== 1) return [];
@@ -112,7 +112,7 @@ export function toCsv(rows: DiaryRow[]): string {
 /**
  * Build the diary for every watched film.
  *
- * Films only — Letterboxd does not track television, so exporting episodes
+ * Films only - Letterboxd does not track television, so exporting episodes
  * would produce entries it can't match.
  */
 export async function buildDiaryCsv(): Promise<{ csv: string; rows: number }> {

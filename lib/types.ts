@@ -9,7 +9,7 @@
  *     "has at least one complete session", never the source of truth.
  *
  *  2. `watched` / `liked` / `rating` / `rewatch` are independent. A film can be
- *     watched and liked with no stars attached, and that is a real state — not
+ *     watched and liked with no stars attached, and that is a real state - not
  *     a missing rating.
  */
 
@@ -18,7 +18,7 @@ export type MediaType = 'movie' | 'tv';
 /** Dexie cannot index booleans, so flags are stored as 0 | 1. */
 export type Flag = 0 | 1;
 
-/** `${mediaType}:${tmdbId}` — the canonical key everything joins on. */
+/** `${mediaType}:${tmdbId}` - the canonical key everything joins on. */
 export type TitleKey = string;
 
 export function titleKey(mediaType: MediaType, tmdbId: number): TitleKey {
@@ -50,18 +50,18 @@ export interface Movie {
   runtime?: number;
   poster?: string;
 
-  // State — all independent, none implies another.
+  // State - all independent, none implies another.
   /** Cache of "any complete session exists". Recomputed by recomputeWatchState. */
   watched: Flag;
   /** Liked without necessarily being rated. */
   liked: Flag;
-  /** 0.5–5.0 in 0.5 steps, or null for "never rated" — which is the norm. */
+  /** 0.5-5.0 in 0.5 steps, or null for "never rated" - which is the norm. */
   rating: number | null;
   /** Complete sessions beyond the first. */
   rewatch: number;
 
   /**
-   * Progress set by hand, 0–1, overriding what was measured.
+   * Progress set by hand, 0-1, overriding what was measured.
    *
    * Measurement is a best guess and sometimes a poor one: a stream padded with
    * adverts, a different cut, or a page that reloaded mid-film and fragmented
@@ -73,7 +73,7 @@ export interface Movie {
   /**
    * Distinct episodes finished, for series only.
    *
-   * A show is never "watched" the way a film is — it accumulates. Cached here
+   * A show is never "watched" the way a film is - it accumulates. Cached here
    * because the authoritative data is spread across sessions and a list view
    * shouldn't scan them per row.
    */
@@ -101,7 +101,7 @@ export const COMPLETION_THRESHOLD = 0.8;
  *
  * `coverage` is a COVERAGE_BUCKETS-length bitmap of which 1% slices were
  * actually played. Completion is measured against bucket coverage, never
- * against `currentTime` — otherwise seeking to the end marks a film watched.
+ * against `currentTime` - otherwise seeking to the end marks a film watched.
  */
 export interface Session {
   id?: number;
@@ -116,14 +116,14 @@ export interface Session {
   stoppedAt?: number;
 
   coverage: Uint8Array;
-  /** Media duration in seconds as reported by the player. Often 0 — see below. */
+  /** Media duration in seconds as reported by the player. Often 0 - see below. */
   durationSec?: number;
   /**
    * Runtime from the resolved catalogue entry, in seconds.
    *
    * The authority when the player won't say. Streaming players routinely report
    * `duration` as NaN with an empty `seekable` range, so the only dependable
-   * runtime comes from the title we matched — which is also more accurate,
+   * runtime comes from the title we matched - which is also more accurate,
    * since it isn't inflated by adverts spliced into the stream.
    */
   runtimeSec?: number;
@@ -138,13 +138,13 @@ export interface ResolverCandidate {
   mediaType: MediaType;
   title: string;
   year?: number;
-  /** 0–1. */
+  /** 0-1. */
   score: number;
 }
 
 /**
  * A detection awaiting user confirmation. Nothing is ever written to a diary
- * or synced outward from here — it has to be confirmed first.
+ * or synced outward from here - it has to be confirmed first.
  */
 export interface PendingDetection {
   id?: number;
@@ -235,7 +235,7 @@ export interface MetaEntry {
 export interface RawDetection {
   /** Present for Tier 2/3 (page metadata). */
   rawTitle?: string;
-  /** Present for Tier 1 (platform adapters) — e.g. a Netflix video id. */
+  /** Present for Tier 1 (platform adapters) - e.g. a Netflix video id. */
   platformId?: string;
   platform?: string;
   strategy: DetectionStrategy;

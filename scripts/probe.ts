@@ -3,8 +3,8 @@
  *
  *   npm run probe -- https://example.com/watch/some-film
  *
- * Exists because the assumption M1 rests on — that long-tail streaming sites
- * leave their titles in the page markup because their traffic depends on it —
+ * Exists because the assumption M1 rests on - that long-tail streaming sites
+ * leave their titles in the page markup because their traffic depends on it -
  * is an empirical claim about sites, not something unit tests can settle.
  * Point this at whatever sites you actually use and see what comes back.
  *
@@ -57,7 +57,7 @@ async function probe(url: string): Promise<void> {
   );
 
   if (candidates.length === 0 && urlIds.length === 0) {
-    console.log('  nothing identifiable — Tier 3 would ask the user');
+    console.log('  nothing identifiable - Tier 3 would ask the user');
     return;
   }
 

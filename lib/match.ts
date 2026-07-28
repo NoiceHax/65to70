@@ -3,8 +3,8 @@ import type { TmdbTitle } from './tmdb';
 /**
  * Scoring a cleaned page title against catalogue candidates.
  *
- * Title cleaning is deliberately conservative — it leaves weak padding in
- * rather than risk deleting a real word — so the matcher has to tolerate extra
+ * Title cleaning is deliberately conservative - it leaves weak padding in
+ * rather than risk deleting a real word - so the matcher has to tolerate extra
  * tokens. Token-set overlap handles that far better than string distance:
  * "Inception Full Movie" still overlaps "Inception" completely.
  */
@@ -14,7 +14,7 @@ import type { TmdbTitle } from './tmdb';
  *
  * The combining-mark removal is restricted to Latin base letters on purpose.
  * Devanagari, Tamil and Thai express vowels as combining marks too, so a blanket
- * `\p{Diacritic}` strip doesn't fold an accent — it deletes half the word.
+ * `\p{Diacritic}` strip doesn't fold an accent - it deletes half the word.
  * "पुष्पा" came back as something that no longer matched itself.
  */
 export function normalizeTitle(title: string): string {
@@ -62,11 +62,11 @@ export interface MatchInput {
   runtimeMinutes?: number;
 }
 
-/** 0–1. Above ~0.75 a single candidate is safe to treat as the answer. */
+/** 0-1. Above ~0.75 a single candidate is safe to treat as the answer. */
 export function scoreMatch(input: MatchInput, candidate: TmdbTitle): number {
   const queryTokens = tokens(input.title);
 
-  // Compare against both the localised and original titles — sites serve
+  // Compare against both the localised and original titles - sites serve
   // whichever suits the viewer's region.
   const titleScore = Math.max(
     tokenOverlap(queryTokens, tokens(candidate.title)),
@@ -81,12 +81,12 @@ export function scoreMatch(input: MatchInput, candidate: TmdbTitle): number {
 
   // The signature of leftover padding: the candidate's whole title appears
   // inside the query ("Inception" within "Inception Full Movie"). Safe in this
-  // direction only — the reverse, where the query is a fragment of a longer
+  // direction only - the reverse, where the query is a fragment of a longer
   // candidate, is how "Alien" gets mistaken for "Alien: Covenant".
   //
   // Scaled by how much of the query the candidate accounts for, not applied as
   // a flat floor. A flat floor tied "Alien" with "Alien: Covenant" on the query
-  // "Alien Covenant Full Movie", since both are subsets — which discarded the
+  // "Alien Covenant Full Movie", since both are subsets - which discarded the
   // very ordering this is meant to preserve.
   const candidateTokens = tokens(candidate.title);
   if (isSubset(candidateTokens, queryTokens)) {

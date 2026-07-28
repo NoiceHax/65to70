@@ -6,7 +6,7 @@ import type { Movie, Source, TitleKey } from './types';
 /**
  * The universal watchlist.
  *
- * Everything collapses to one row per canonical id — which is also the
+ * Everything collapses to one row per canonical id - which is also the
  * duplicate detector, for free: regional title variants and differently-spelled
  * listings resolve to the same TMDB id and merge automatically.
  *
@@ -39,7 +39,7 @@ export async function removeFromWatchlist(key: TitleKey): Promise<void> {
 
   const remaining = movie.sources.filter((source) => !WATCHLIST_KINDS.has(source.kind));
 
-  // Nothing left to justify the row and nothing invested in it — drop it.
+  // Nothing left to justify the row and nothing invested in it - drop it.
   const worthKeeping =
     remaining.length > 0 ||
     movie.watched === 1 ||
@@ -83,7 +83,7 @@ export async function watchlist(): Promise<WatchlistEntry[]> {
 /**
  * Titles saved more than once under different provenance.
  *
- * Not a feature so much as a by-product of canonical ids — worth surfacing
+ * Not a feature so much as a by-product of canonical ids - worth surfacing
  * because it's the visible proof the merge worked.
  */
 export async function duplicatesAcrossPlatforms(): Promise<WatchlistEntry[]> {

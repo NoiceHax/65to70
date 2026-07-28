@@ -39,7 +39,7 @@ let library: LibraryEntry[] = [];
 function render(entry: LibraryEntry): HTMLElement {
   const badge = document.createElement('span');
   badge.className = BADGE_CLASS;
-  // textContent, never innerHTML — this runs on pages we don't control.
+  // textContent, never innerHTML - this runs on pages we don't control.
   badge.textContent = badgeText(entry);
   badge.style.cssText = [
     'display:inline-block',
@@ -89,7 +89,7 @@ let offeredFor = '';
  * Offer to save a searched film.
  *
  * Searching for something is a statement of interest, and right now is the
- * cheapest moment to save it — cheaper than remembering to add it later, which
+ * cheapest moment to save it - cheaper than remembering to add it later, which
  * is the step everyone skips. Only ever asks once per query, and only when the
  * background is confident the query names a real title that isn't already
  * known.

@@ -8,7 +8,7 @@ import { getSettings } from './settings';
  * Load prepared indexes that ship inside the extension.
  *
  * These were originally something the user had to build and then hand-feed to
- * the extension through a file picker — a developer's workflow wearing a user
+ * the extension through a file picker - a developer's workflow wearing a user
  * interface. Anything that arrives in the build should already be in place by
  * the time anyone opens the settings page.
  *
@@ -17,15 +17,15 @@ import { getSettings } from './settings';
  * extension, not one loaded unpacked, where a refresh is just another build.
  *
  * Files are read from the extension's own package, so this is not a network
- * request and nothing leaves the machine. Missing files are normal — they
- * simply haven't been built — and are skipped without complaint.
+ * request and nothing leaves the machine. Missing files are normal - they
+ * simply haven't been built - and are skipped without complaint.
  */
 
 async function readBundled<T>(path: string): Promise<T | null> {
   try {
     // WXT types getURL against the files it can see in public/ when types are
     // generated. These are built by the pipeline and git-ignored, so they're
-    // never in that union — the cast says "generated at build time, not
+    // never in that union - the cast says "generated at build time, not
     // checked in", which is exactly the situation.
     const response = await fetch(browser.runtime.getURL(path as never));
     if (!response.ok) return null;

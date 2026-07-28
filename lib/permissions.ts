@@ -30,7 +30,7 @@ export const SEARCH_ORIGINS = [
 /**
  * Content scripts registered at runtime, keyed by id.
  *
- * `scope` decides which granted origins each one runs on — the overlay must not
+ * `scope` decides which granted origins each one runs on - the overlay must not
  * be injected into every site the user tracks, and the tracker has no business
  * on a search results page.
  */
@@ -78,7 +78,7 @@ export const ALL_SITES = '*://*/*';
  * also, on aggregator sites, unworkable: those pages load the player from a
  * separate host, offer a switcher that changes that host with every click, and
  * rotate the domains outright every few weeks. Granting them one at a time is a
- * treadmill, and worse, it trains someone to approve unfamiliar domains — which
+ * treadmill, and worse, it trains someone to approve unfamiliar domains - which
  * is how ad and tracking origins end up granted by mistake.
  *
  * So this exists, off by default, stated plainly, and revocable in one click.

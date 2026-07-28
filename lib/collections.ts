@@ -2,7 +2,7 @@ import { db } from './db';
 import type { Collection, Movie, TitleKey } from './types';
 
 /**
- * Named local lists — "Movies for Dad", "Christmas", "Horror Marathon".
+ * Named local lists - "Movies for Dad", "Christmas", "Horror Marathon".
  *
  * A separate table rather than reusing tags, because collections are ordered
  * and get their own UI. Nothing here is shared or uploaded.

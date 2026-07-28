@@ -15,7 +15,7 @@ import type { MediaType } from './types';
  *     Impossible - Fallout" would lose half its title. Instead drop segments
  *     that are *entirely* noise and rejoin what's left.
  *
- *  2. A parenthesised year or an SxxExx marker is a hard boundary — everything
+ *  2. A parenthesised year or an SxxExx marker is a hard boundary - everything
  *     before it is the title. This is far more reliable than word-stripping,
  *     so it runs first when present.
  */
@@ -34,7 +34,7 @@ export interface CleanedTitle {
  * STRONG words never occur at the end of a genuine title, so a trailing run of
  * them can be removed outright.
  *
- * WEAK words are common in page-title padding but also occur in real titles —
+ * WEAK words are common in page-title padding but also occur in real titles -
  * "The Lego Movie", "Apocalypse Now", "The Final Cut". They're only ever used
  * to decide whether an entire separator-delimited segment is junk; they are
  * never stripped off the end of a title. Losing "Movie" from "The Lego Movie"
@@ -111,6 +111,8 @@ const WEAK_NOISE = new Set([
   'a',
 ]);
 
+// These dash characters are data, not prose: sites really do write
+// "Inception — 2010" in a page title, so the separator has to match them.
 const SEPARATOR = /\s+[|–—»·]\s+|\s+-\s+/;
 
 const SE_PATTERNS: RegExp[] = [
@@ -127,7 +129,7 @@ const MAX_YEAR = new Date().getFullYear() + 2;
 
 /**
  * Unicode-aware on purpose. Stripping to `[a-z0-9]` would reduce any
- * non-Latin title — Devanagari, Tamil, Japanese — to an empty string, which
+ * non-Latin title - Devanagari, Tamil, Japanese - to an empty string, which
  * the noise checks below would then read as pure padding and discard. Regional
  * titles are a first-class case, not an edge case.
  */
@@ -160,7 +162,7 @@ function validYear(n: number): boolean {
 
 /**
  * Remove a trailing run of STRONG noise. Stops at the first word that could
- * plausibly belong to the title — including weak-noise words, which is what
+ * plausibly belong to the title - including weak-noise words, which is what
  * keeps "The Lego Movie" and "Apocalypse Now" intact.
  */
 function stripTrailingNoise(text: string): string {
@@ -258,7 +260,7 @@ export function isUsableTitle(cleaned: CleanedTitle): boolean {
   /*
    * Marketing taglines, not titles.
    *
-   * A landing page announces itself with a list — "Watch TV Shows, Movies,
+   * A landing page announces itself with a list - "Watch TV Shows, Movies,
    * Specials, Live Cricket & Football". Three or more commas is the giveaway:
    * real titles almost never reach that. Two is deliberately allowed, because
    * films like "Sex, Lies, and Videotape" exist and losing one is worse than
@@ -267,7 +269,7 @@ export function isUsableTitle(cleaned: CleanedTitle): boolean {
   if ((t.match(/,/g) ?? []).length >= 3) return false;
   if (t.length > 90) return false;
 
-  // Whatever survived cleaning is still just padding — e.g. "Watch Now"
+  // Whatever survived cleaning is still just padding - e.g. "Watch Now"
   // reduces to "Now", which is a real film but not a real detection here.
   const words = t.split(/\s+/).filter(Boolean);
   if (words.every(isAnyNoise)) return false;

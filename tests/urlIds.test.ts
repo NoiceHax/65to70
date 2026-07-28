@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { extractUrlIds, seasonEpisodeFromUrl } from '@/lib/urlIds';
 
-describe('extractUrlIds — bare path ids', () => {
+describe('extractUrlIds - bare path ids', () => {
   it('reads the id from a neutral /watch/<id> path', () => {
     // The real failing case: a client-rendered site whose markup carries no
     // usable title, but whose URL is keyed on a TMDB id.
@@ -32,7 +32,7 @@ describe('extractUrlIds — bare path ids', () => {
   });
 });
 
-describe('extractUrlIds — IMDb', () => {
+describe('extractUrlIds - IMDb', () => {
   it('reads an IMDb id from the path and marks it exact', () => {
     const ids = extractUrlIds('https://vidsrc.to/embed/movie/tt1375666');
     expect(ids).toContainEqual(
@@ -46,7 +46,7 @@ describe('extractUrlIds — IMDb', () => {
   });
 });
 
-describe('extractUrlIds — explicit query parameters', () => {
+describe('extractUrlIds - explicit query parameters', () => {
   it('trusts a named tmdb parameter', () => {
     const [id] = extractUrlIds('https://example.com/embed?tmdb=27205');
     expect(id).toMatchObject({ source: 'tmdb', id: '27205', confidence: 'exact' });
@@ -95,7 +95,7 @@ describe('seasonEpisodeFromUrl', () => {
   });
 });
 
-describe('extractUrlIds — rejections', () => {
+describe('extractUrlIds - rejections', () => {
   it('returns nothing for a slug-based URL', () => {
     expect(extractUrlIds('https://example.com/movie/inception-2010')).toEqual([]);
   });

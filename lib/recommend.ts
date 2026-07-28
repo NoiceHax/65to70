@@ -93,7 +93,7 @@ export async function recommend(
       const contribution = weight * positionWeight(position, related.length);
       scores.set(candidateId, (scores.get(candidateId) ?? 0) + contribution);
 
-      // Only positive influences are worth naming — "because you disliked X"
+      // Only positive influences are worth naming - "because you disliked X"
       // is not a reason anyone wants to read.
       if (weight > 0) {
         credits.set(candidateId, [
@@ -138,8 +138,8 @@ export async function recommend(
  * Why the list might be empty or thin.
  *
  * Recommendations need both a relationship index and something to recommend
- * from. Distinguishing the two matters — one is a setup step, the other just
- * needs more watching — and "no recommendations" alone says neither.
+ * from. Distinguishing the two matters - one is a setup step, the other just
+ * needs more watching - and "no recommendations" alone says neither.
  */
 export async function recommendationReadiness(): Promise<{
   hasIndex: boolean;

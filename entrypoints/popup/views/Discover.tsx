@@ -12,8 +12,8 @@ import {
  * Computed on this machine from a prepared relationship index. Nothing about
  * what you watch is sent anywhere to produce these.
  *
- * Every row states why it's here in checkable terms — "Because you watched
- * Inception and Interstellar" — and never as a match percentage.
+ * Every row states why it's here in checkable terms - "Because you watched
+ * Inception and Interstellar" - and never as a match percentage.
  */
 export default function Discover() {
   const [rows, setRows] = useState<Recommendation[]>([]);
@@ -38,7 +38,7 @@ export default function Discover() {
     /*
      * Two different problems, and neither is the user's to diagnose.
      *
-     * This previously named a script and told them to load a file — a build
+     * This previously named a script and told them to load a file - a build
      * step described in a popup, as though the extension shipping without its
      * own data were something they had done wrong.
      */
@@ -49,7 +49,7 @@ export default function Discover() {
         <h2>For you</h2>
         <p className="empty">
           Suggestions aren&apos;t available in this build. Once they are, they
-          run entirely on this machine — nothing about what you watch is sent
+          run entirely on this machine - nothing about what you watch is sent
           anywhere to produce them.
         </p>
       </section>
@@ -61,8 +61,8 @@ export default function Discover() {
       <section>
         <h2>For you</h2>
         <p className="empty">
-          Nothing to go on yet. Confirm a few films you&apos;ve watched — or like
-          or rate some — and suggestions build from there.
+          Nothing to go on yet. Confirm a few films you&apos;ve watched - or like
+          or rate some - and suggestions build from there.
         </p>
       </section>
     );
@@ -86,7 +86,7 @@ export default function Discover() {
         <p className="empty">
           {availableOnly
             ? 'Nothing suggested is streaming in your region right now.'
-            : 'Nothing to suggest yet — a few more watched titles will help.'}
+            : 'Nothing to suggest yet - a few more watched titles will help.'}
         </p>
       ) : (
         <ul className="library">

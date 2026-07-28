@@ -4,7 +4,7 @@ A local-first watch tracker and universal watchlist for the browser.
 
 It notices what you actually finish across every site you use, merges your
 scattered watchlists into one, and pushes your history out to Simkl, Trakt or
-Letterboxd — without your viewing history ever leaving your machine.
+Letterboxd - without your viewing history ever leaving your machine.
 
 > Working name. Renaming is a find-and-replace plus one manifest field.
 
@@ -57,7 +57,7 @@ TMDB_API_KEY=xxx npx vite-node pipeline/buildAvailability.ts -- IN
 ```
 
 The title index lets popular titles resolve with no network call at all. The
-availability index maps titles to the services carrying them in one region —
+availability index maps titles to the services carrying them in one region -
 TMDB publishes no bulk export for this, so the script pages `/discover` per
 provider and shards by release year to stay under the 500-page cap. Any shard
 that still hits the cap is reported rather than passed off as complete.
@@ -74,7 +74,7 @@ Four tiers, in order of preference:
 | Ask once | The user names it, the selector is remembered | Everything else |
 
 Completion is measured against a 100-bucket coverage bitmap, not playback
-position — skipping to the credits leaves coverage at ~5%, and coverage unions
+position - skipping to the credits leaves coverage at ~5%, and coverage unions
 across sessions so a film watched over two nights still counts.
 
 ## Diagnosing a site
@@ -85,7 +85,7 @@ npm run probe -- https://example.com/watch/12345
 
 Runs the real detection pipeline against a live page and prints every
 candidate with the strategy that produced it. Fetches server-rendered HTML
-only, so client-rendered sites look emptier here than in a real browser — a
+only, so client-rendered sites look emptier here than in a real browser - a
 poor result is a reason to check in the extension, not a verdict.
 
 ## Not implemented
@@ -102,7 +102,7 @@ poor result is a reason to check in the extension, not a verdict.
 ```
 entrypoints/
   background.ts          resolver, sessions, sync orchestration
-  generic.content.ts     tiers 1–3, registered at runtime only
+  generic.content.ts     tiers 1-3, registered at runtime only
   overlay.content.ts     search result annotation
   popup/  options/       React
 lib/

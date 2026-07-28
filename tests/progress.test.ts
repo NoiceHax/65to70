@@ -108,7 +108,7 @@ describe('completion', () => {
   });
 
   it('counts a film watched across two sittings', () => {
-    // Half on Monday, half on Friday — neither session completes alone.
+    // Half on Monday, half on Friday - neither session completes alone.
     const monday = cover(range(0, 44));
     const friday = cover(range(40, 89));
 

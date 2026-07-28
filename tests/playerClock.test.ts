@@ -28,7 +28,7 @@ describe('parseClock', () => {
   });
 });
 
-describe('readPlayerClock — from the scrubber', () => {
+describe('readPlayerClock - from the scrubber', () => {
   it('reads the slider a screen reader would', () => {
     // Preferred source: these values have to be correct for the player to be
     // usable without sight, so they survive when the media element does not.
@@ -61,7 +61,7 @@ describe('readPlayerClock — from the scrubber', () => {
   });
 });
 
-describe('readPlayerClock — from rendered time', () => {
+describe('readPlayerClock - from rendered time', () => {
   it('reads elapsed and total together', () => {
     const doc = docFrom('<body><span>1:23:45 / 2:14:30</span></body>');
     expect(readPlayerClock(doc)).toEqual({

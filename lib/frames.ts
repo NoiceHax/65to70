@@ -4,7 +4,7 @@ import type { EmbeddedFrame } from './messages';
 /**
  * Working out which origin actually holds the player.
  *
- * The obvious approach — reading iframe `src` attributes from the page — is
+ * The obvious approach - reading iframe `src` attributes from the page - is
  * wrong in the case that matters. Embed hosts redirect: the markup says
  * `player.videasy.net`, the frame lands on `player.videasy.to`, and a
  * permission granted for the first never reaches the second. The page can't
@@ -25,7 +25,7 @@ export const PLAYER_URL =
  * Cross-origin frames currently loaded in a tab.
  *
  * Returns an empty list rather than throwing when the permission is missing or
- * the tab is gone — this feeds a diagnostics panel, and a diagnostic that
+ * the tab is gone - this feeds a diagnostics panel, and a diagnostic that
  * breaks when things go wrong is worthless.
  */
 export async function liveFramesForTab(tabId: number): Promise<EmbeddedFrame[]> {

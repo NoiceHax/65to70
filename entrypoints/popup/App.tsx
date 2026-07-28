@@ -24,7 +24,7 @@ function App() {
     setPendingCount(pending);
     setWatchedCount(watched);
 
-    // Open on whichever screen has something to act on, but only once —
+    // Open on whichever screen has something to act on, but only once -
     // afterwards which tab is showing is the user's business.
     if (!landed) {
       setTab(pending > 0 ? 'queue' : watched > 0 ? 'library' : 'sites');

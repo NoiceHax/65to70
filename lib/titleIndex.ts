@@ -8,7 +8,7 @@ import type { TmdbTitle } from './tmdb';
  * The point of this index is that the common case never leaves the machine. A
  * naive resolver asks TMDB for every detection, which hands them the title of
  * everything you watch. With the index loaded, popular titles resolve locally
- * and the network is only touched for the long tail — and only with consent.
+ * and the network is only touched for the long tail - and only with consent.
  *
  * Aliases matter more than they look: sites serve titles in the viewer's
  * language, so a Hindi or Tamil rendering of a film is an ordinary input here.
@@ -106,7 +106,7 @@ function toTmdbTitle(entry: IndexEntry): TmdbTitle {
  *
  * Deliberately exact rather than fuzzy. Fuzzy matching over a 40,000-entry map
  * on every detection is slow, and the caller already runs a proper scorer over
- * whatever comes back — so this only has to be a fast, cheap way to get
+ * whatever comes back - so this only has to be a fast, cheap way to get
  * plausible candidates without the network.
  */
 export async function lookupLocal(title: string): Promise<TmdbTitle[]> {
@@ -131,7 +131,7 @@ let byId: Map<number, IndexEntry> | null = null;
  * Look a title up by its TMDB id.
  *
  * Needed so confirming a detection works with no API key. Everything else had
- * been made to run offline, but confirming still called TMDB for details —
+ * been made to run offline, but confirming still called TMDB for details -
  * which meant the bundled index resolved a title and then refused to record
  * it, for want of a key nobody should have needed.
  */

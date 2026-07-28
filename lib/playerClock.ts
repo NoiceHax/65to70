@@ -2,7 +2,7 @@
  * Reading the player's own clock.
  *
  * `video.duration` is frequently NaN on streaming players and `seekable` is
- * often empty — yet the same player is displaying "1:23:45 / 2:14:30" on screen
+ * often empty - yet the same player is displaying "1:23:45 / 2:14:30" on screen
  * the whole time. The runtime was never actually unavailable; it just wasn't
  * exposed through the API being asked.
  *
@@ -10,7 +10,7 @@
  * can be trusted:
  *
  *  1. The scrubber's ARIA values. Players expose it as a slider for keyboard
- *     and screen-reader users, and those numbers are the ones driving the UI —
+ *     and screen-reader users, and those numbers are the ones driving the UI -
  *     structured, unambiguous, and maintained because accessibility tooling
  *     depends on them.
  *  2. Rendered timestamps. Less reliable, since a page can contain other
@@ -45,7 +45,7 @@ function plausibleRuntime(seconds: number): boolean {
  * The scrubber, read through its accessibility attributes.
  *
  * Preferred because these values are what the control actually reports to
- * assistive technology — they have to be correct for the player to be usable
+ * assistive technology - they have to be correct for the player to be usable
  * without sight, so they tend to be right even when the media element isn't.
  */
 function fromAria(root: ParentNode): PlayerClock | null {
@@ -124,7 +124,7 @@ function fromText(root: ParentNode): PlayerClock | null {
  * What the player is showing the viewer.
  *
  * Returns null when nothing clock-shaped is on screen, which is the honest
- * answer — better than a number invented from a partial reading.
+ * answer - better than a number invented from a partial reading.
  */
 export function readPlayerClock(root: ParentNode): PlayerClock | null {
   return fromAria(root) ?? fromText(root);

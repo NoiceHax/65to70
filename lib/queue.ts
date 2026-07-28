@@ -6,7 +6,7 @@ import type { Movie } from './types';
  * "What should I watch next?"
  *
  * Deliberately not a recommender. It orders titles the user already chose,
- * which sidesteps the cold-start problem entirely and — more importantly —
+ * which sidesteps the cold-start problem entirely and - more importantly -
  * can't really be wrong: every candidate is something they put on the list
  * themselves.
  *
@@ -60,7 +60,7 @@ export async function suggestQueue(
     const reasons: string[] = [];
     let score = 0;
     // An explicit flag rather than a large negative score. A sentinel value can
-    // be cancelled out by later bonuses — the age bonus did exactly that, and a
+    // be cancelled out by later bonuses - the age bonus did exactly that, and a
     // three-hour film came back inside a ninety-minute budget.
     let excluded = false;
 
