@@ -18,6 +18,7 @@
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { tmdbApiKey } from '../scripts/env';
+import { getJson } from '../scripts/http';
 
 const API = 'https://api.themoviedb.org/3';
 const MAX_PAGE = 500;
@@ -37,28 +38,39 @@ interface ProviderInfo {
   provider_name: string;
 }
 
-async function getJson<T>(path: string, params: Record<string, string>): Promise<T> {
+let dropped = 0;
+
+/**
+ * A page of results, or null if it couldn't be had.
+ *
+ * Returning null rather than throwing is deliberate. This run makes thousands
+ * of requests over a long period and TMDB drops connections intermittently;
+ * letting one failure abort the whole thing discards everything already
+ * gathered. Losses are counted and reported at the end instead, so an
+ * incomplete index is known to be incomplete.
+ */
+async function fetchPage<T>(path: string, params: Record<string, string>): Promise<T | null> {
   const url = new URL(`${API}${path}`);
   url.searchParams.set('api_key', apiKey!);
   for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
 
-  for (let attempt = 0; attempt < 5; attempt++) {
-    const response = await fetch(url);
-    if (response.status === 429) {
-      // TMDB asks for a breather rather than refusing outright.
-      await new Promise((r) => setTimeout(r, 2000 * (attempt + 1)));
-      continue;
-    }
-    if (!response.ok) throw new Error(`${path} → HTTP ${response.status}`);
-    return (await response.json()) as T;
-  }
-  throw new Error(`${path} → gave up after repeated rate limiting`);
+  const result = await getJson<T>(url, { retries: 5 });
+  if (result === null) dropped++;
+  return result;
 }
 
 async function flatrateProviders(): Promise<ProviderInfo[]> {
-  const data = await getJson<{ results: ProviderInfo[] }>('/watch/providers/movie', {
+  const data = await fetchPage<{ results: ProviderInfo[] }>('/watch/providers/movie', {
     watch_region: region,
   });
+
+  // The one request worth failing over: without the provider list there is
+  // nothing to build.
+  if (!data?.results?.length) {
+    console.error(`Could not fetch the provider list for ${region}. Check the key and try again.`);
+    process.exit(1);
+  }
+
   return data.results;
 }
 
@@ -72,7 +84,7 @@ async function idsForProvider(providerId: number): Promise<{ ids: number[]; trun
     let totalPages = 1;
 
     do {
-      const data = await getJson<{
+      const data = await fetchPage<{
         page: number;
         total_pages: number;
         results: { id: number }[];
@@ -83,6 +95,14 @@ async function idsForProvider(providerId: number): Promise<{ ids: number[]; trun
         primary_release_year: String(year),
         page: String(page),
       });
+
+      // A page that never arrived after its retries. Counted in `dropped` and
+      // reported at the end — skipping it loses a few titles, aborting loses
+      // the whole run.
+      if (!data) {
+        page++;
+        continue;
+      }
 
       for (const result of data.results) ids.add(result.id);
       totalPages = Math.min(data.total_pages, MAX_PAGE);
@@ -139,11 +159,18 @@ async function main(): Promise<void> {
   writeFileSync(outPath, JSON.stringify(index));
 
   console.log(`\nWrote ${Object.keys(titles).length} titles to ${outPath}`);
+
   if (warnings.length > 0) {
     console.warn('\nIncomplete coverage:');
     for (const warning of warnings) console.warn(`  ${warning}`);
   }
-  console.log('\nLoad it through the extension options page.');
+  if (dropped > 0) {
+    // An index short of a few pages is fine; an index that quietly hides that
+    // fact is not.
+    console.warn(`\n${dropped} request(s) failed after retries — some titles are missing.`);
+  }
+
+  console.log('\nRebuild the extension (npm run build) — it loads this itself.');
 }
 
 await main();

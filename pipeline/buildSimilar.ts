@@ -20,6 +20,7 @@
 import { writeFileSync, mkdirSync, readFileSync, existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { tmdbApiKey } from '../scripts/env';
+import { getJson } from '../scripts/http';
 
 const API = 'https://api.themoviedb.org/3';
 const CONCURRENCY = 20;
@@ -63,18 +64,19 @@ interface Recommendation {
   release_date?: string;
 }
 
+/** Requests lost after their retries were spent. Reported, never hidden. */
+let dropped = 0;
+
 async function recommendationsFor(id: number): Promise<Recommendation[]> {
   const url = new URL(`${API}/movie/${id}/recommendations`);
   url.searchParams.set('api_key', apiKey!);
 
-  const response = await fetch(url);
-  if (response.status === 429) {
-    await new Promise((r) => setTimeout(r, 2000));
-    return recommendationsFor(id);
+  const data = await getJson<{ results?: Recommendation[] }>(url, { retries: 4 });
+  if (!data) {
+    dropped++;
+    return [];
   }
-  if (!response.ok) return [];
 
-  const data = (await response.json()) as { results?: Recommendation[] };
   return (data.results ?? []).slice(0, KEEP_PER_TITLE);
 }
 
@@ -126,6 +128,7 @@ async function main(): Promise<void> {
     `\nWrote ${Object.keys(similar).length} relationship lists ` +
       `covering ${Object.keys(titles).length} titles to ${outPath}`,
   );
+  if (dropped > 0) console.warn(`${dropped} request(s) failed after retries — re-run to fill the gaps.`);
   console.log('Rebuild the extension (npm run build) — it loads this itself.');
 }
 
