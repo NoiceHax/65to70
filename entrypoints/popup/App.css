@@ -269,6 +269,56 @@ ul {
   color: var(--muted);
 }
 
+h2.spaced {
+  margin-top: 20px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.chip {
+  padding: 3px 9px;
+  border-radius: 12px;
+  font-size: 11.5px;
+}
+
+.chip.on {
+  border-color: transparent;
+  background: var(--accent);
+  color: #fff;
+}
+
+.chip .dim {
+  opacity: 0.6;
+}
+
+.chip.add {
+  padding: 3px 8px;
+}
+
+.row-actions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 2px;
+}
+
+.add-to {
+  width: 26px;
+  padding: 1px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  cursor: pointer;
+}
+
 .watch-row {
   align-items: flex-start;
 }

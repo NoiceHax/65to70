@@ -38,4 +38,34 @@ export interface MediaProgressMessage {
   ended: boolean;
 }
 
-export type KeeperMessage = PageMetaMessage | MediaProgressMessage;
+/**
+ * The overlay asks for a snapshot of the local library.
+ *
+ * Content scripts can't reach the extension's IndexedDB, so the background
+ * hands over a compact, already-normalised list. Scoping the overlay to titles
+ * the user already has a relationship with is what makes it tractable —
+ * recognising arbitrary film names in arbitrary page text is not.
+ */
+export interface LibraryRequest {
+  type: 'library-request';
+}
+
+export interface LibraryEntry {
+  /** Normalised title, ready to match against page text. */
+  n: string;
+  title: string;
+  year?: number;
+  rating: number | null;
+  liked: boolean;
+  watched: boolean;
+  /** ISO date the title was last confirmed as watched. */
+  at?: string;
+  /** Streaming services carrying it in the user's region. */
+  on?: string[];
+}
+
+export interface LibraryResponse {
+  entries: LibraryEntry[];
+}
+
+export type KeeperMessage = PageMetaMessage | MediaProgressMessage | LibraryRequest;

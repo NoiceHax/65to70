@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import { removeFromWatchlist, watchlist, type WatchlistEntry } from '@/lib/watchlist';
 import { providersForMany } from '@/lib/providers';
+import {
+  addToCollection,
+  createCollection,
+  listCollections,
+  type CollectionWithItems,
+} from '@/lib/collections';
 
 /**
  * The merged watchlist.
@@ -12,11 +18,14 @@ import { providersForMany } from '@/lib/providers';
 export default function Watchlist() {
   const [entries, setEntries] = useState<WatchlistEntry[]>([]);
   const [available, setAvailable] = useState<Map<number, string[]>>(new Map());
+  const [collections, setCollections] = useState<CollectionWithItems[]>([]);
+  const [filter, setFilter] = useState<number | null>(null);
 
   const refresh = useCallback(async () => {
     const rows = await watchlist();
     setEntries(rows);
     setAvailable(await providersForMany(rows.map((r) => r.movie.tmdbId)));
+    setCollections(await listCollections());
   }, []);
 
   useEffect(() => {
@@ -32,11 +41,47 @@ export default function Watchlist() {
     );
   }
 
+  const inFilter =
+    filter === null
+      ? null
+      : new Set(
+          collections.find((c) => c.collection.id === filter)?.movies.map((m) => m.key) ?? [],
+        );
+
+  const visible = inFilter ? entries.filter((e) => inFilter.has(e.movie.key)) : entries;
+
+  const newCollection = async () => {
+    const name = prompt('Name this collection');
+    if (name?.trim()) {
+      await createCollection(name);
+      await refresh();
+    }
+  };
+
   return (
     <section>
-      <h2>Watchlist ({entries.length})</h2>
+      <h2>Watchlist ({visible.length})</h2>
+
+      <div className="chips">
+        <button className={filter === null ? 'chip on' : 'chip'} onClick={() => setFilter(null)}>
+          All
+        </button>
+        {collections.map(({ collection, movies }) => (
+          <button
+            key={collection.id}
+            className={filter === collection.id ? 'chip on' : 'chip'}
+            onClick={() => setFilter(filter === collection.id ? null : collection.id!)}
+          >
+            {collection.name} <span className="dim">{movies.length}</span>
+          </button>
+        ))}
+        <button className="chip add" onClick={() => void newCollection()} title="New collection">
+          +
+        </button>
+      </div>
+
       <ul className="library">
-        {entries.map(({ movie, savedOn, addedAt }) => {
+        {visible.map(({ movie, savedOn, addedAt }) => {
           const where = available.get(movie.tmdbId) ?? [];
           return (
             <li key={movie.key} className="watch-row">
@@ -51,16 +96,38 @@ export default function Watchlist() {
                 </span>
                 {where.length > 0 && <span className="where">{where.join(' · ')}</span>}
               </div>
-              <button
-                className="mark inline"
-                title="Remove from watchlist"
-                onClick={async () => {
-                  await removeFromWatchlist(movie.key);
-                  await refresh();
-                }}
-              >
-                ×
-              </button>
+              <div className="row-actions">
+                {collections.length > 0 && (
+                  <select
+                    className="add-to"
+                    value=""
+                    title="Add to a collection"
+                    onChange={async (e) => {
+                      const id = Number(e.target.value);
+                      if (!id) return;
+                      await addToCollection(id, movie.key);
+                      await refresh();
+                    }}
+                  >
+                    <option value="">+</option>
+                    {collections.map(({ collection }) => (
+                      <option key={collection.id} value={collection.id}>
+                        {collection.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                <button
+                  className="mark inline"
+                  title="Remove from watchlist"
+                  onClick={async () => {
+                    await removeFromWatchlist(movie.key);
+                    await refresh();
+                  }}
+                >
+                  ×
+                </button>
+              </div>
             </li>
           );
         })}

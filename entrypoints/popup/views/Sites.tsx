@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { browser } from 'wxt/browser';
 import {
+  SEARCH_SITES,
   SUGGESTED_SITES,
   grantedOrigins,
   originPatternFor,
@@ -47,9 +48,11 @@ export default function Sites({ onChange }: { onChange: () => void }) {
     onChange();
   };
 
-  const custom = origins.filter(
-    (o) => !SUGGESTED_SITES.some((s) => s.origin === o),
-  );
+  const known = [
+    ...SUGGESTED_SITES.map((s) => s.origin as string),
+    ...SEARCH_SITES.map((s) => s.origin as string),
+  ];
+  const custom = origins.filter((o) => !known.includes(o));
 
   return (
     <section>
@@ -83,6 +86,29 @@ export default function Sites({ onChange }: { onChange: () => void }) {
             <label>
               <input type="checkbox" checked onChange={() => void toggle(origin)} />
               {origin.replace('*://', '').replace('/*', '')}
+            </label>
+          </li>
+        ))}
+      </ul>
+
+      <h2 className="spaced">Search results</h2>
+      <p className="note">
+        Marks films you have already seen or saved when they show up in search
+        results. Granted separately, because these pages have nothing to do with
+        playback. Nothing is reordered or rewritten — only annotated — and no
+        request leaves your machine.
+      </p>
+
+      <ul className="sites">
+        {SEARCH_SITES.map((site) => (
+          <li key={site.origin}>
+            <label>
+              <input
+                type="checkbox"
+                checked={isGranted(site.origin)}
+                onChange={() => void toggle(site.origin)}
+              />
+              {site.label}
             </label>
           </li>
         ))}

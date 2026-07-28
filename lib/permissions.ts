@@ -14,13 +14,40 @@ import { browser } from 'wxt/browser';
  * sync with reality.
  */
 
-/** Content scripts registered at runtime, keyed by id. */
-const RUNTIME_SCRIPTS = {
-  generic: {
+/**
+ * Origins where the search overlay is useful. Kept separate because the overlay
+ * is a different bargain from watch tracking: it reads result headings on pages
+ * that have nothing to do with playback, so it's granted separately and never
+ * implied by turning on a streaming site.
+ */
+export const SEARCH_ORIGINS = [
+  '*://*.google.com/*',
+  '*://*.duckduckgo.com/*',
+  '*://*.bing.com/*',
+  '*://*.imdb.com/*',
+] as const;
+
+/**
+ * Content scripts registered at runtime, keyed by id.
+ *
+ * `scope` decides which granted origins each one runs on — the overlay must not
+ * be injected into every site the user tracks, and the tracker has no business
+ * on a search results page.
+ */
+const RUNTIME_SCRIPTS = [
+  {
     id: 'keeper-generic',
     js: ['content-scripts/generic.js'],
+    allFrames: true,
+    scope: 'watch' as const,
   },
-} as const;
+  {
+    id: 'keeper-overlay',
+    js: ['content-scripts/overlay.js'],
+    allFrames: false,
+    scope: 'search' as const,
+  },
+];
 
 /** Sites offered during onboarding. Users can add any other site themselves. */
 export const SUGGESTED_SITES = [
@@ -29,6 +56,17 @@ export const SUGGESTED_SITES = [
   { label: 'JioHotstar', origin: '*://*.hotstar.com/*' },
   { label: 'YouTube', origin: '*://*.youtube.com/*' },
 ] as const;
+
+export const SEARCH_SITES = [
+  { label: 'Google', origin: '*://*.google.com/*' },
+  { label: 'DuckDuckGo', origin: '*://*.duckduckgo.com/*' },
+  { label: 'Bing', origin: '*://*.bing.com/*' },
+  { label: 'IMDb', origin: '*://*.imdb.com/*' },
+] as const;
+
+function isSearchOrigin(origin: string): boolean {
+  return (SEARCH_ORIGINS as readonly string[]).includes(origin);
+}
 
 export async function grantedOrigins(): Promise<string[]> {
   const perms = await browser.permissions.getAll();
@@ -71,10 +109,15 @@ export async function syncContentScripts(): Promise<void> {
   const existing = await browser.scripting.getRegisteredContentScripts();
   const existingIds = new Set(existing.map((s) => s.id));
 
-  for (const script of Object.values(RUNTIME_SCRIPTS)) {
-    // No granted origins means nothing to match — unregister rather than
-    // registering a script with an empty matches array (which is invalid).
-    if (origins.length === 0) {
+  for (const script of RUNTIME_SCRIPTS) {
+    const matches =
+      script.scope === 'search'
+        ? origins.filter(isSearchOrigin)
+        : origins.filter((origin) => !isSearchOrigin(origin));
+
+    // An empty matches array is invalid, so unregister instead of registering
+    // a script that can never run.
+    if (matches.length === 0) {
       if (existingIds.has(script.id)) {
         await browser.scripting.unregisterContentScripts({ ids: [script.id] });
       }
@@ -84,10 +127,10 @@ export async function syncContentScripts(): Promise<void> {
     const registration = {
       id: script.id,
       js: [...script.js],
-      matches: origins,
+      matches,
       // Embedded players are commonly cross-origin iframes; the title usually
-      // lives in the parent frame, so both need the script.
-      allFrames: true,
+      // lives in the parent frame, so both need the tracker.
+      allFrames: script.allFrames,
       runAt: 'document_idle' as const,
     };
 

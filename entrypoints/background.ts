@@ -2,6 +2,7 @@ import { browser } from 'wxt/browser';
 import { syncContentScripts } from '@/lib/permissions';
 import { db } from '@/lib/db';
 import { handleMediaProgress, handlePageMeta, handleTabClosed } from '@/lib/sessionStore';
+import { librarySnapshot } from '@/lib/librarySnapshot';
 import type { KeeperMessage } from '@/lib/messages';
 
 export default defineBackground(() => {
@@ -21,11 +22,19 @@ export default defineBackground(() => {
     void syncContentScripts();
   });
 
-  browser.runtime.onMessage.addListener((message, sender) => {
+  browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    const msg = message as KeeperMessage;
+
+    // The overlay needs an answer, so this branch returns true to keep the
+    // channel open for the async reply.
+    if (msg.type === 'library-request') {
+      void librarySnapshot().then((entries) => sendResponse({ entries }));
+      return true;
+    }
+
     const tabId = sender.tab?.id;
     if (tabId === undefined) return;
 
-    const msg = message as KeeperMessage;
     switch (msg.type) {
       case 'page-meta':
         void handlePageMeta(tabId, msg);
@@ -34,7 +43,7 @@ export default defineBackground(() => {
         void handleMediaProgress(tabId, msg);
         break;
     }
-    // No response is sent; returning undefined keeps the channel synchronous.
+    // No response for the fire-and-forget messages.
   });
 
   browser.tabs.onRemoved.addListener((tabId) => {
