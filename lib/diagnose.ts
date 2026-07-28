@@ -27,6 +27,15 @@ export interface FrameReport {
   clocks: { selector: string; text: string }[];
   sliders: { valueNow: string | null; valueMax: string | null }[];
   iframes: string[];
+  /**
+   * Distinct outbound hosts linked from the page.
+   *
+   * Added after a dump could not answer whether film-database links were
+   * reachable, because the report showed no links at all. Hosts rather than
+   * full URLs: enough to recognise what a page is about, without pasting
+   * someone's browsing around.
+   */
+  linkedHosts: string[];
   shadowRoots: number;
 }
 
@@ -105,6 +114,21 @@ export function collectFrameReport(): FrameReport {
     .filter(Boolean)
     .slice(0, 15);
 
+  const hosts = new Set<string>();
+  for (const link of Array.from(document.querySelectorAll('a[href]'))) {
+    const href = link.getAttribute('href') ?? '';
+    try {
+      // Search engines wrap outbound links, so unwrap before reading the host.
+      const url = new URL(href, location.href);
+      const target = url.searchParams.get('q') ?? url.searchParams.get('url') ?? href;
+      const { hostname, protocol } = new URL(target, location.href);
+      if (protocol !== 'http:' && protocol !== 'https:') continue;
+      if (hostname && hostname !== location.hostname) hosts.add(hostname);
+    } catch {
+      // Relative or malformed; nothing to read.
+    }
+  }
+
   return {
     url: location.href.slice(0, 200),
     isTop: window.top === window,
@@ -119,6 +143,7 @@ export function collectFrameReport(): FrameReport {
     clocks,
     sliders,
     iframes,
+    linkedHosts: [...hosts].slice(0, 20),
     shadowRoots,
   };
 }
@@ -149,6 +174,9 @@ export function formatReports(reports: FrameReport[]): string {
       lines.push(`   titleish ${entry.selector}: ${entry.text}`);
     }
     for (const frame of report.iframes) lines.push(`   iframe: ${frame}`);
+    if (report.linkedHosts.length > 0) {
+      lines.push(`   links to: ${report.linkedHosts.join(', ')}`);
+    }
 
     if (report.shadowRoots > 0) lines.push(`   shadow roots: ${report.shadowRoots}`);
     lines.push('');

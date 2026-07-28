@@ -51,3 +51,45 @@ describe('searchLooksLikeScreenTitle', () => {
     expect(searchLooksLikeScreenTitle(docFrom('<body></body>'))).toBe(false);
   });
 });
+
+describe('searchLooksLikeScreenTitle - panel signals', () => {
+  it('recognises a where-to-watch section', () => {
+    const doc = docFrom('<body><h2>Where to watch</h2><div>JioHotstar</div></body>');
+    expect(searchLooksLikeScreenTitle(doc)).toBe(true);
+  });
+
+  it('recognises watchlist controls', () => {
+    const doc = docFrom('<body><button>Want to watch</button></body>');
+    expect(searchLooksLikeScreenTitle(doc)).toBe(true);
+  });
+
+  it('recognises two information labels together', () => {
+    const doc = docFrom(`
+      <body>
+        <span>Release date</span><span>19 June 2009</span>
+        <span>Running time</span><span>1h 48m</span>
+      </body>`);
+    expect(searchLooksLikeScreenTitle(doc)).toBe(true);
+  });
+
+  it('recognises two review services quoted together', () => {
+    const doc = docFrom(`
+      <body>
+        <div><span>IMDb</span><span>6.8/10</span></div>
+        <div><span>Rotten Tomatoes</span><span>45%</span></div>
+      </body>`);
+    expect(searchLooksLikeScreenTitle(doc)).toBe(true);
+  });
+
+  it('is not convinced by a single weak label', () => {
+    // "Director" alone turns up in plenty of unrelated contexts, which is why
+    // weak signals are counted rather than trusted.
+    const doc = docFrom('<body><span>Director</span><span>Jane Smith</span></body>');
+    expect(searchLooksLikeScreenTitle(doc)).toBe(false);
+  });
+
+  it('is not convinced by one review service alone', () => {
+    const doc = docFrom('<body><span>IMDb</span></body>');
+    expect(searchLooksLikeScreenTitle(doc)).toBe(false);
+  });
+});

@@ -57,9 +57,29 @@ export function findLibraryMatch(
  */
 const FILM_REFERENCE = /(^|\.)(imdb\.com|rottentomatoes\.com|themoviedb\.org|letterboxd\.com|metacritic\.com|justwatch\.com)$/i;
 
+/**
+ * Phrases that only appear when a search engine has decided the subject is
+ * something you watch. Any one of these settles it on its own.
+ */
+const STRONG_PHRASE =
+  /^(where to watch|want to watch|already watched|watch now|watch options|streaming now)$/i;
+
+/**
+ * Labels from a film or series information panel.
+ *
+ * Individually weak - "Director" appears in plenty of other contexts - so two
+ * are required together. A panel about a film carries most of them at once,
+ * and a page about anything else carries none.
+ */
+const PANEL_LABEL =
+  /^(release date|director|directors|screenplay|running time|box office|distributed by|budget|starring|cast|seasons?|episodes?|first episode date|network|producers?|writers?)$/i;
+
 /** Descriptions a knowledge panel uses for screen titles. */
 const FILM_DESCRIPTION =
-  /\b(tv series|television series|web series|miniseries|feature film|American film|film series|directed by|season \d|episodes?\b.*\bseasons?)\b/i;
+  /\b(tv series|television series|web series|miniseries|feature film|film series|\d{4} film)\b/i;
+
+/** "6.8/10", "45%", "3.4/5" beside a named review service. */
+const RATING_SERVICE = /^(imdb|rotten tomatoes|letterboxd|metacritic)$/i;
 
 /**
  * Whether this search is actually about something watchable.
@@ -87,14 +107,34 @@ export function searchLooksLikeScreenTitle(root: ParentNode): boolean {
     }
   }
 
-  // Knowledge panels are short and descriptive. Long prose is an article that
-  // merely mentions a film.
-  for (const element of Array.from(root.querySelectorAll('span, div, h2'))) {
+  /*
+   * Then the panel itself.
+   *
+   * Short elements only. A knowledge panel is built from labels and values, so
+   * everything worth reading is a few words; long prose is an article that
+   * happens to mention a film and proves nothing.
+   *
+   * Weak signals are counted rather than trusted alone. A page about a film
+   * carries several of them together, and a page about anything else carries
+   * none, so two is a clear line without needing any one of them to be certain.
+   */
+  let weak = 0;
+  const services = new Set<string>();
+
+  for (const element of Array.from(root.querySelectorAll('span, div, h2, h3, a, button'))) {
     const text = element.textContent?.trim() ?? '';
-    if (text.length > 0 && text.length <= 80 && FILM_DESCRIPTION.test(text)) return true;
+    if (text.length === 0 || text.length > 80) continue;
+
+    if (STRONG_PHRASE.test(text)) return true;
+    if (FILM_DESCRIPTION.test(text)) weak += 2;
+    if (PANEL_LABEL.test(text)) weak++;
+    if (RATING_SERVICE.test(text)) services.add(text.toLowerCase());
+
+    if (weak >= 2) return true;
   }
 
-  return false;
+  // Two review services quoted side by side is a film panel and nothing else.
+  return services.size >= 2;
 }
 
 /** The line shown next to a matched result. */
