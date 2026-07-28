@@ -115,25 +115,73 @@ const primeVideo: SiteAdapter = {
     /(^|\.)primevideo\.com$/.test(hostname) || /(^|\.)amazon\.[a-z.]+$/.test(hostname),
 
   read(doc) {
-    const title =
+    /*
+     * The player's class names are hashed now, and the ones this adapter used
+     * to read no longer exist. Only a handful of semantic `atvwebplayersdk-`
+     * names survive and none of them carry the title, so those selectors are
+     * kept purely as a fallback for older builds.
+     *
+     * What is dependable is the document title, which the app maintains as
+     * "Prime Video: <name> - Season N", and the episode heading. Both are load
+     * bearing for the page itself, so neither can quietly disappear the way a
+     * generated class name can.
+     */
+    const fromPlayer =
       text(doc, '.atvwebplayersdk-title-text') ??
       text(doc, '[data-automation-id="title"]');
+
+    const documentTitle = doc.title?.trim() ?? '';
+    const fromDocument = documentTitle
+      .replace(/^Prime Video:\s*/i, '')
+      .replace(/\s*-\s*Season\s*\d+\s*$/i, '')
+      .trim();
+
+    const title = fromPlayer ?? (fromDocument.length > 1 ? fromDocument : null);
     if (!title) return null;
 
-    // Series carry a subtitle like "S1 E2 - Episode Name".
+    // "Season 1, Ep. 1 Gawaar Goldy", or the older "S1 E2 - Name" subtitle.
     const subtitle = text(doc, '.atvwebplayersdk-subtitle-text');
-    const match = subtitle?.match(/S(\d+)\s*[·:]?\s*E(\d+)/i);
+    const episode =
+      matchEpisode(subtitle ?? '') ??
+      matchEpisodeInHeadings(doc) ??
+      matchEpisode(documentTitle);
 
     return {
-      rawTitle: withEpisode(
-        title,
-        match ? Number(match[1]) : undefined,
-        match ? Number(match[2]) : undefined,
-      ),
+      rawTitle: withEpisode(title, episode?.season, episode?.episode),
       strategy: 'manual',
+      season: episode?.season,
+      episode: episode?.episode,
     };
   },
 };
+
+/** Both shapes Prime uses to name an episode. */
+function matchEpisode(text: string): { season: number; episode: number } | null {
+  const patterns = [
+    /\bSeason\s*(\d{1,2})\s*,?\s*Ep\.?\s*(\d{1,3})\b/i,
+    /\bS(\d{1,2})\s*[·:]?\s*E(\d{1,3})\b/i,
+  ];
+
+  for (const pattern of patterns) {
+    const found = text.match(pattern);
+    if (!found) continue;
+
+    const season = Number(found[1]);
+    const episode = Number(found[2]);
+    if (season >= 1 && season <= 50 && episode >= 1) return { season, episode };
+  }
+
+  return null;
+}
+
+/** The episode is a heading on the playback page, not a player element. */
+function matchEpisodeInHeadings(doc: Document): { season: number; episode: number } | null {
+  for (const heading of Array.from(doc.querySelectorAll('h1, h2, h3'))) {
+    const found = matchEpisode(heading.textContent ?? '');
+    if (found) return found;
+  }
+  return null;
+}
 
 // ---------------------------------------------------------------------------
 // JioHotstar

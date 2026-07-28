@@ -118,6 +118,8 @@ const SEPARATOR = /\s+[|–—»·]\s+|\s+-\s+/;
 const SE_PATTERNS: RegExp[] = [
   /\bS(\d{1,2})\s*[·:]?\s*E(\d{1,3})\b/i,
   /\bSeason\s+(\d{1,2})\s*(?:,|-|–|:)?\s*Episode\s+(\d{1,3})\b/i,
+  // "Season 1, Ep. 1" - the abbreviated form, used by at least one service.
+  /\bSeason\s*(\d{1,2})\s*,?\s*Ep\.?\s*(\d{1,3})\b/i,
   /\b(\d{1,2})x(\d{2,3})\b/,
 ];
 

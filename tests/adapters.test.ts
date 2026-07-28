@@ -72,6 +72,35 @@ describe('Prime Video', () => {
     expect(meta?.rawTitle).toBe('The Boys S2E3');
   });
 
+  it('reads the title and episode from the page when the player classes are gone', () => {
+    // Prime's player class names are hashed now and the ones this adapter used
+    // to read no longer exist. The document title and episode heading do, and
+    // both are load bearing for the page itself.
+    const doc = docFrom(`
+      <body>
+        <h1>Adarsh Baal Vidyalaya</h1>
+        <h2>Season 1, Ep. 1 Gawaar Goldy</h2>
+      </body>`);
+    doc.title = 'Prime Video: Adarsh Baal Vidyalaya - Season 1';
+
+    const meta = readAdapterMeta(doc, 'https://www.primevideo.com/detail/0KJ', 'www.primevideo.com');
+    expect(meta).toMatchObject({ season: 1, episode: 1 });
+    expect(cleanTitle(meta!.rawTitle)).toMatchObject({
+      title: 'Adarsh Baal Vidyalaya',
+      season: 1,
+      episode: 1,
+      mediaType: 'tv',
+    });
+  });
+
+  it('strips the service name and season suffix from the document title', () => {
+    const doc = docFrom('<body></body>');
+    doc.title = 'Prime Video: Fallout - Season 2';
+
+    const meta = readAdapterMeta(doc, 'https://www.primevideo.com/detail/0KJ', 'www.primevideo.com');
+    expect(meta?.rawTitle).toBe('Fallout');
+  });
+
   it('handles a film with no subtitle', () => {
     const doc = docFrom('<body><div class="atvwebplayersdk-title-text">Arrival</div></body>');
     const meta = readAdapterMeta(doc, 'https://www.primevideo.com/detail/0XYZ', 'www.primevideo.com');
