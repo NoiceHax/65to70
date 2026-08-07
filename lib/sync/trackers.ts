@@ -99,7 +99,7 @@ export async function buildHistory(): Promise<HistoryItem[]> {
  * season and episode structure, with a watch date on each episode. So episodes
  * are grouped back under their show and season here.
  */
-function toPayload(items: HistoryItem[]) {
+export function toPayload(items: HistoryItem[]) {
   const movies = items
     .filter((item) => item.mediaType === 'movie')
     .map((item) => ({
